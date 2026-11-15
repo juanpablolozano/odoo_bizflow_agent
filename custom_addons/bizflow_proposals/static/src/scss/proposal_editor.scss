@@ -84,21 +84,24 @@
 }
 
 .o_bizflow_editor_preview {
+    min-height: 0;
     overflow: hidden;
     background: #e8edf2;
+    position: relative;
 }
 
 .o_bizflow_editor_preview iframe {
+    display: block;
     width: 100%;
     height: 100%;
     border: 0;
     background: white;
-    /* Preview only — blocks click-through when header buttons re-render (e.g. Refresh). */
-    pointer-events: none;
 }
 
+/* Only block the preview while a soft-refresh remounts controls (avoids click-through). */
 .o_bizflow_editor.o_bizflow_refreshing .o_bizflow_editor_body,
-.o_bizflow_editor.o_bizflow_refreshing .o_bizflow_editor_preview {
+.o_bizflow_editor.o_bizflow_refreshing .o_bizflow_editor_preview,
+.o_bizflow_editor.o_bizflow_refreshing .o_bizflow_editor_preview iframe {
     pointer-events: none;
 }
 
