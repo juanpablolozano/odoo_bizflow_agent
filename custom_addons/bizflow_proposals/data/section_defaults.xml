@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <!-- Placeholder record marker; section defaults live in Python schema. -->
+    <record id="bizflow_install_marker" model="ir.config_parameter">
+        <field name="key">bizflow_proposals.installed</field>
+        <field name="value">1</field>
+    </record>
+</odoo>

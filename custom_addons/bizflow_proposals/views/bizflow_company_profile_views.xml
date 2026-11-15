@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_bizflow_company_profile_form" model="ir.ui.view">
+        <field name="name">bizflow.company.profile.form</field>
+        <field name="model">bizflow.company.profile</field>
+        <field name="arch" type="xml">
+            <form string="Company profile">
+                <sheet>
+                    <group>
+                        <field name="company_id"/>
+                    </group>
+                    <notebook>
+                        <page string="Contact" name="contact">
+                            <group>
+                                <field name="website" widget="url"/>
+                                <field name="phone"/>
+                                <field name="phone_alt"/>
+                                <field name="email" widget="email"/>
+                                <field name="social_url" widget="url"/>
+                                <field name="address"/>
+                            </group>
+                        </page>
+                        <page string="Terms" name="terms">
+                            <group string="Terms and conditions">
+                                <field name="terms_text" nolabel="1" colspan="2"/>
+                            </group>
+                            <group string="Responsibilities">
+                                <field name="responsibilities_text" nolabel="1" colspan="2"/>
+                            </group>
+                            <group string="Warranty">
+                                <field name="warranty_text" nolabel="1" colspan="2"/>
+                            </group>
+                        </page>
+                        <page string="Signatures" name="signatures">
+                            <field name="signer_ids">
+                                <list editable="bottom">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="name"/>
+                                    <field name="title"/>
+                                    <field name="signature_image" widget="image" options="{'size': [120, 60]}"/>
+                                    <field name="active"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_bizflow_company_profile_list" model="ir.ui.view">
+        <field name="name">bizflow.company.profile.list</field>
+        <field name="model">bizflow.company.profile</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="company_id"/>
+                <field name="website"/>
+                <field name="phone"/>
+                <field name="email"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_bizflow_company_profile" model="ir.actions.act_window">
+        <field name="name">Company profile</field>
+        <field name="res_model">bizflow.company.profile</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Configure contact info, terms, and signatures for proposal documents.
+            </p>
+        </field>
+    </record>
+</odoo>

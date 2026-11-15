@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_bizflow_proposal_list" model="ir.ui.view">
+        <field name="name">bizflow.proposal.list</field>
+        <field name="model">bizflow.proposal</field>
+        <field name="arch" type="xml">
+            <list string="Proposals">
+                <field name="code"/>
+                <field name="name"/>
+                <field name="partner_id"/>
+                <field name="lead_id"/>
+                <field name="state" widget="badge"/>
+                <field name="amount_total"/>
+                <field name="amount_utility"/>
+                <field name="user_id" widget="many2one_avatar_user"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_bizflow_proposal_form" model="ir.ui.view">
+        <field name="name">bizflow.proposal.form</field>
+        <field name="model">bizflow.proposal</field>
+        <field name="arch" type="xml">
+            <form string="Proposal">
+                <header>
+                    <button name="action_open_editor" type="object" string="Open editor" class="btn-primary"/>
+                    <button name="action_set_review" type="object" string="Mark review" invisible="state != 'draft'"/>
+                    <button name="action_set_sent" type="object" string="Mark sent" invisible="state not in ('draft','review')"/>
+                    <button name="action_set_accepted" type="object" string="Accepted" invisible="state == 'accepted'"/>
+                    <button name="action_set_rejected" type="object" string="Rejected" invisible="state in ('accepted','rejected')"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,review,sent,accepted"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name" placeholder="Kitchen remodel — Smith residence"/></h1>
+                        <h3><field name="code" readonly="1"/></h3>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="partner_id"/>
+                            <field name="lead_id"/>
+                            <field name="user_id"/>
+                            <field name="project_type"/>
+                            <field name="location"/>
+                        </group>
+                        <group>
+                            <field name="language"/>
+                            <field name="pdf_template_id"/>
+                            <field name="before_after_model_id"/>
+                            <field name="access_required"/>
+                            <field name="access_code"/>
+                            <field name="amount_total"/>
+                            <field name="amount_utility"/>
+                            <field name="utility_margin"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Description">
+                            <group>
+                                <field name="brief" placeholder="Client context, problem, measurements, meeting notes…"/>
+                                <field name="work_brief" placeholder="What must be built: trades, finishes, constraints…"/>
+                                <field name="description" invisible="1"/>
+                                <field name="kind"/>
+                            </group>
+                        </page>
+                        <page string="Lines">
+                            <field name="line_ids">
+                                <list editable="bottom">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="line_type"/>
+                                    <field name="name"/>
+                                    <field name="supplier_id"/>
+                                    <field name="quantity"/>
+                                    <field name="uom_name"/>
+                                    <field name="price_unit"/>
+                                    <field name="cost_unit"/>
+                                    <field name="price_subtotal"/>
+                                    <field name="source"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Photos">
+                            <group>
+                                <field name="cover_image" widget="image"/>
+                                <field name="before_image" widget="image"/>
+                                <field name="after_image" widget="image"/>
+                            </group>
+                        </page>
+                        <page string="Share links">
+                            <field name="share_link_ids">
+                                <list>
+                                    <field name="name"/>
+                                    <field name="purpose"/>
+                                    <field name="token"/>
+                                    <field name="enabled"/>
+                                    <field name="allow_download"/>
+                                    <field name="views"/>
+                                    <button name="action_open_link" type="object" string="Open"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_bizflow_proposal" model="ir.actions.act_window">
+        <field name="name">Proposals</field>
+        <field name="res_model">bizflow.proposal</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Create a construction proposal</p>
+        </field>
+    </record>
+
+    <record id="action_bizflow_proposal_editor" model="ir.actions.client">
+        <field name="name">Proposal editor</field>
+        <field name="tag">bizflow_proposal_editor</field>
+        <field name="target">current</field>
+    </record>
+</odoo>

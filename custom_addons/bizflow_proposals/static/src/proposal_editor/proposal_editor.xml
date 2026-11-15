@@ -1,0 +1,617 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="bizflow_proposals.ProposalEditor">
+        <div class="o_bizflow_editor" t-att-class="{'o_bizflow_refreshing': this.state.refreshing}">
+            <div class="o_bizflow_editor_header">
+                <t t-if="this.state.mode === 'edit' and this.state.proposal">
+                    <button type="button" class="secondary" t-on-click="() => this.loadList()">←</button>
+                    <span class="badge" t-esc="this.state.proposal.code"/>
+                    <h1 t-esc="this.state.proposal.name"/>
+                    <span class="badge" t-esc="this.state.proposal.state"/>
+                    <button type="button" t-on-click="this.onGenerateNow">Write with AI</button>
+                    <button type="button" t-on-click="this.onSyncUtility">Sync utility</button>
+                    <button type="button" t-on-click="this.onCreateShare">Share link</button>
+                    <button type="button" t-on-click.stop.prevent="this.onRefresh"
+                            t-att-disabled="this.state.refreshing">Refresh</button>
+                </t>
+                <t t-elif="this.state.mode === 'new'">
+                    <button class="secondary" t-on-click="() => this.loadList()">←</button>
+                    <h1 t-esc="this.copy.newProposal"/>
+                </t>
+                <t t-else="">
+                    <h1 t-esc="this.copy.listTitle"/>
+                    <button t-on-click="() => this.startNew()" t-esc="this.copy.newProposal"/>
+                </t>
+            </div>
+
+            <!-- LIST -->
+            <t t-if="this.state.mode === 'list'">
+                <div class="o_bizflow_empty">
+                    <p>Create one, describe the job (include measurements), add photos, and let AI write the first draft.</p>
+                    <ul class="o_bizflow_list">
+                        <t t-foreach="this.state.list" t-as="item" t-key="item.id">
+                            <li>
+                                <span>
+                                    <strong t-esc="item.code"/> — <t t-esc="item.name"/>
+                                    <span class="text-muted"> (<t t-esc="item.state"/>)</span>
+                                </span>
+                                <button t-on-click="() => this.openProposal(item.id)">Open</button>
+                            </li>
+                        </t>
+                    </ul>
+                </div>
+            </t>
+
+            <!-- NEW -->
+            <t t-if="this.state.mode === 'new'">
+                <div class="o_bizflow_new">
+                    <aside class="o_bizflow_editor_sidebar">
+                        <p class="o_bizflow_eyebrow" t-esc="this.copy.tellAi"/>
+                        <div class="o_bizflow_field">
+                            <label>Client</label>
+                            <input t-att-value="this.state.clientName"
+                                   t-on-input="(ev) => this.onFieldInput('clientName', ev)"
+                                   placeholder="Client name"/>
+                        </div>
+                        <div class="o_bizflow_field">
+                            <label>Language</label>
+                            <select t-on-change="(ev) => this.onFieldInput('language', ev)">
+                                <option value="es" t-att-selected="this.state.language === 'es'">Español</option>
+                                <option value="en" t-att-selected="this.state.language === 'en'">English</option>
+                            </select>
+                        </div>
+                        <div class="o_bizflow_field">
+                            <label t-esc="this.copy.briefLabel"/>
+                            <textarea rows="8"
+                                      t-att-value="this.state.brief"
+                                      t-on-input="(ev) => this.onFieldInput('brief', ev)"
+                                      t-att-placeholder="this.copy.briefPh"/>
+                        </div>
+                        <div class="o_bizflow_field">
+                            <label t-esc="this.copy.workLabel"/>
+                            <textarea rows="5"
+                                      t-att-value="this.state.workBrief"
+                                      t-on-input="(ev) => this.onFieldInput('workBrief', ev)"
+                                      t-att-placeholder="this.copy.workPh"/>
+                        </div>
+                        <div class="o_bizflow_field">
+                            <label>Project type</label>
+                            <input t-att-value="this.state.projectType"
+                                   t-on-input="(ev) => this.onFieldInput('projectType', ev)"
+                                   placeholder="Kitchen remodel, roofing…"/>
+                        </div>
+                        <div class="o_bizflow_field">
+                            <label>Location</label>
+                            <input t-att-value="this.state.location"
+                                   t-on-input="(ev) => this.onFieldInput('location', ev)"/>
+                        </div>
+                        <div class="o_bizflow_actions">
+                            <button class="secondary" t-on-click="() => this.onCreateProposal(false)"
+                                    t-att-disabled="this.state.creating"
+                                    t-esc="this.copy.createEmpty"/>
+                            <button t-on-click="() => this.onCreateProposal(true)"
+                                    t-att-disabled="this.state.creating"
+                                    t-esc="this.copy.createAi"/>
+                        </div>
+                    </aside>
+                    <main class="o_bizflow_editor_preview o_bizflow_cover_preview">
+                        <div class="o_bizflow_cover_card">
+                            <p class="eyebrow">BizFlow · Proposal</p>
+                            <h2 t-esc="this.state.clientName || 'Client'"/>
+                            <p t-esc="this.state.brief || this.copy.briefPh"/>
+                        </div>
+                    </main>
+                </div>
+            </t>
+
+            <!-- EDIT -->
+            <t t-if="this.state.mode === 'edit' and this.state.proposal">
+                <t t-if="this.showBusyOverlay">
+                    <div class="o_bizflow_overlay">
+                        <div class="o_bizflow_overlay_card">
+                            <t t-if="this.isGenerating">
+                                <h2 t-esc="this.copy.writing"/>
+                                <p t-esc="this.copy.writingHint"/>
+                                <div class="o_bizflow_progress">
+                                    <div class="bar" t-att-style="'width:' + (this.state.proposal.generation.percent || 0) + '%'"/>
+                                </div>
+                                <p class="muted">
+                                    <t t-esc="this.state.proposal.generation.percent || 0"/>%
+                                    · <t t-esc="this.state.proposal.generation.section || ''"/>
+                                </p>
+                            </t>
+                            <t t-else="">
+                                <h2 t-esc="this.copy.generatingAfter"/>
+                                <p t-esc="this.copy.generatingAfterHint"/>
+                                <div class="o_bizflow_progress o_bizflow_progress_indeterminate">
+                                    <div class="bar"/>
+                                </div>
+                            </t>
+                        </div>
+                    </div>
+                </t>
+                <div class="o_bizflow_editor_body">
+                    <aside class="o_bizflow_editor_sidebar">
+                        <div class="o_bizflow_tabs">
+                            <button t-att-class="{'active': this.state.tab === 'sections'}" t-on-click="() => this.setTab('sections')" t-esc="this.copy.sections"/>
+                            <button t-att-class="{'active': this.state.tab === 'ai'}" t-on-click="() => this.setTab('ai')" t-esc="this.copy.aiAll"/>
+                            <button t-att-class="{'active': this.state.tab === 'images'}" t-on-click="() => this.setTab('images')" t-esc="this.copy.images"/>
+                            <button t-att-class="{'active': this.state.tab === 'materials'}" t-on-click="() => this.setTab('materials')" t-esc="this.copy.materials"/>
+                            <button t-att-class="{'active': this.state.tab === 'utility'}" t-on-click="() => this.setTab('utility')" t-esc="this.copy.utility"/>
+                            <button t-att-class="{'active': this.state.tab === 'share'}" t-on-click="() => this.setTab('share')" t-esc="this.copy.share"/>
+                            <button t-att-class="{'active': this.state.tab === 'sign'}" t-on-click="() => this.setTab('sign')">Sign</button>
+                            <button t-att-class="{'active': this.state.tab === 'costs'}" t-on-click="() => this.setTab('costs')">Costs</button>
+                            <button t-att-class="{'active': this.state.tab === 'history'}" t-on-click="() => this.setTab('history')" t-esc="this.copy.history"/>
+                            <button t-att-class="{'active': this.state.tab === 'design'}" t-on-click="() => this.setTab('design')" t-esc="this.copy.design"/>
+                        </div>
+
+                        <t t-if="this.state.tab === 'sections'">
+                            <div class="o_bizflow_section_list">
+                                <t t-foreach="this.sectionEntries" t-as="entry" t-key="entry.key">
+                                    <button t-att-class="{'active': this.state.sectionKey === entry.key}"
+                                            t-on-click="() => this.selectSection(entry.key)">
+                                        <span t-esc="entry.label"/>
+                                        <span t-if="entry.hidden" class="muted">hidden</span>
+                                    </button>
+                                </t>
+                            </div>
+                            <div class="o_bizflow_tabs o_bizflow_subtabs">
+                                <button t-att-class="{'active': this.state.sectionMode === 'chat'}" t-on-click="() => this.setSectionMode('chat')" t-esc="this.copy.chat"/>
+                                <button t-att-class="{'active': this.state.sectionMode === 'edit'}" t-on-click="() => this.setSectionMode('edit')" t-esc="this.copy.edit"/>
+                                <button t-att-class="{'active': this.state.sectionMode === 'images'}" t-on-click="() => this.setSectionMode('images')" t-esc="this.copy.images"/>
+                            </div>
+                            <p class="muted" t-esc="this.copy.noTech"/>
+
+                            <t t-if="this.state.sectionMode === 'chat'">
+                                <div class="o_bizflow_chat">
+                                    <div class="o_bizflow_chat_thread">
+                                        <t t-foreach="this.state.chatMessages" t-as="msg" t-key="msg.id">
+                                            <div t-att-class="'bubble ' + msg.role">
+                                                <p t-esc="msg.text"/>
+                                            </div>
+                                        </t>
+                                    </div>
+                                    <textarea rows="3"
+                                              t-att-value="this.state.chatInput"
+                                              t-on-input="(ev) => this.onFieldInput('chatInput', ev)"
+                                              t-on-keydown="(ev) => this.onChatKeydown(ev)"
+                                              t-att-placeholder="this.copy.chatPh"/>
+                                    <div class="o_bizflow_actions">
+                                        <button class="secondary" t-on-click="this.resetChat">New chat</button>
+                                        <button t-on-click="this.sendChat" t-att-disabled="this.state.chatBusy" t-esc="this.copy.send"/>
+                                    </div>
+                                </div>
+                            </t>
+
+                            <t t-if="this.state.sectionMode === 'edit'">
+                                <t t-foreach="this.sectionFields" t-as="field" t-key="field.key">
+                                    <div class="o_bizflow_field">
+                                        <label t-esc="field.label"/>
+                                        <t t-if="field.type === 'textarea'">
+                                            <textarea rows="4"
+                                                      t-att-value="this.state.form[field.key]"
+                                                      t-on-input="(ev) => this.onFormField(field.key, ev)"/>
+                                        </t>
+                                        <t t-else="">
+                                            <input t-att-type="field.type === 'number' ? 'number' : 'text'"
+                                                   t-att-value="this.state.form[field.key]"
+                                                   t-on-input="(ev) => this.onFormField(field.key, ev)"/>
+                                        </t>
+                                    </div>
+                                </t>
+                                <t t-if="this.state.conflict">
+                                    <div class="o_bizflow_conflict">
+                                        <p t-esc="this.state.conflict.message"/>
+                                        <button t-on-click="() => this.resolveConflict(true)">Keep mine</button>
+                                        <button class="secondary" t-on-click="() => this.resolveConflict(false)">Use theirs</button>
+                                    </div>
+                                </t>
+                                <div class="o_bizflow_actions">
+                                    <button t-on-click="this.onSaveSection">Save</button>
+                                    <button class="secondary" t-on-click="this.onToggleHidden">Toggle hidden</button>
+                                </div>
+                            </t>
+
+                            <t t-if="this.state.sectionMode === 'images'">
+                                <div class="o_bizflow_field">
+                                    <label>Slot</label>
+                                    <select t-on-change="(ev) => this.onFieldInput('imageSlot', ev)">
+                                        <option value="cover">Cover</option>
+                                        <option value="before">Before</option>
+                                        <option value="after">After</option>
+                                        <option value="extra">Extra</option>
+                                    </select>
+                                </div>
+                                <div class="o_bizflow_field">
+                                    <label>Label</label>
+                                    <input t-att-value="this.state.imageLabel"
+                                           t-on-input="(ev) => this.onFieldInput('imageLabel', ev)"/>
+                                </div>
+                                <div class="o_bizflow_field">
+                                    <label t-esc="this.copy.upload"/>
+                                    <input type="file" accept="image/*" t-on-change="(ev) => this.onPickImage(ev)"/>
+                                </div>
+                            </t>
+                        </t>
+
+                        <t t-if="this.state.tab === 'ai'">
+                            <p>Change what the proposal says across pages (prices, scope, tone) or which pages show.</p>
+                            <div class="o_bizflow_chat">
+                                <div class="o_bizflow_chat_thread">
+                                    <t t-foreach="this.state.chatMessages" t-as="msg" t-key="msg.id">
+                                        <div t-att-class="'bubble ' + msg.role">
+                                            <p t-esc="msg.text"/>
+                                        </div>
+                                    </t>
+                                </div>
+                                <textarea rows="3"
+                                          t-att-value="this.state.chatInput"
+                                          t-on-input="(ev) => this.onFieldInput('chatInput', ev)"
+                                          t-on-keydown="(ev) => this.onChatKeydown(ev)"
+                                          t-att-placeholder="this.copy.chatPh"/>
+                                <div class="o_bizflow_actions">
+                                    <button class="secondary" t-on-click="this.resetChat">New chat</button>
+                                    <button t-on-click="this.sendChat" t-att-disabled="this.state.chatBusy" t-esc="this.copy.send"/>
+                                </div>
+                            </div>
+                        </t>
+
+                        <t t-if="this.state.tab === 'images'">
+                            <div class="o_bizflow_field">
+                                <label>Slot</label>
+                                <select t-att-value="this.state.imageSlot"
+                                        t-att-disabled="this.state.imageBusy"
+                                        t-on-change="(ev) => this.onFieldInput('imageSlot', ev)">
+                                    <option value="cover">Cover</option>
+                                    <option value="before">Before</option>
+                                    <option value="after">After</option>
+                                </select>
+                            </div>
+                            <div class="o_bizflow_field">
+                                <label t-esc="this.copy.upload"/>
+                                <input type="file"
+                                       accept="image/*"
+                                       multiple="multiple"
+                                       t-att-disabled="this.state.imageBusy"
+                                       t-on-change="(ev) => this.onPickImage(ev)"/>
+                            </div>
+                            <div class="o_bizflow_field">
+                                <label>After prompt notes</label>
+                                <textarea rows="3"
+                                          t-att-value="this.state.afterNotes"
+                                          t-att-disabled="this.state.imageBusy"
+                                          t-on-input="(ev) => this.onFieldInput('afterNotes', ev)"/>
+                            </div>
+                            <h3 class="o_bizflow_images_heading" t-esc="this.copy.beforePhotos"/>
+                            <ul class="o_bizflow_list o_bizflow_asset_list">
+                                <t t-foreach="this.beforeAssets" t-as="asset" t-key="asset.id">
+                                    <li class="o_bizflow_asset_card">
+                                        <div class="o_bizflow_asset_item">
+                                            <t t-if="asset.url">
+                                                <img class="o_bizflow_asset_thumb"
+                                                     t-att-src="asset.url"
+                                                     t-att-alt="asset.label || asset.filename || 'image'"/>
+                                            </t>
+                                            <div class="o_bizflow_asset_meta">
+                                                <strong t-esc="asset.label || asset.filename || ('#' + asset.id)"/>
+                                                <span class="muted">before</span>
+                                            </div>
+                                            <button class="secondary o_bizflow_asset_remove"
+                                                    t-att-disabled="this.state.imageBusy"
+                                                    t-on-click="() => this.onDeleteAsset(asset.id)"
+                                                    t-esc="this.copy.deleteImage"/>
+                                        </div>
+                                        <div class="o_bizflow_actions o_bizflow_asset_actions">
+                                            <button t-on-click="() => this.onGenerateAfter(asset.id)"
+                                                    t-att-disabled="this.state.imageBusy"
+                                                    t-esc="this.state.imageBusy ? this.copy.generatingAfter : this.copy.generateAfter"/>
+                                        </div>
+                                        <div class="o_bizflow_after_group">
+                                            <div class="muted o_bizflow_after_label" t-esc="this.copy.afterForThis"/>
+                                            <t t-if="!this.aftersFor(asset.id).length">
+                                                <p class="muted" t-esc="this.copy.noAfterYet"/>
+                                            </t>
+                                            <ul class="o_bizflow_list o_bizflow_asset_list o_bizflow_after_list">
+                                                <t t-foreach="this.aftersFor(asset.id)" t-as="after" t-key="after.id">
+                                                    <li class="o_bizflow_asset_item">
+                                                        <t t-if="after.url">
+                                                            <img class="o_bizflow_asset_thumb"
+                                                                 t-att-src="after.url"
+                                                                 t-att-alt="after.label || after.filename || 'after'"/>
+                                                        </t>
+                                                        <div class="o_bizflow_asset_meta">
+                                                            <strong t-esc="after.label || after.filename || ('#' + after.id)"/>
+                                                            <span class="muted">after</span>
+                                                        </div>
+                                                        <button class="secondary o_bizflow_asset_remove"
+                                                                t-att-disabled="this.state.imageBusy"
+                                                                t-on-click="() => this.onDeleteAsset(after.id)"
+                                                                t-esc="this.copy.deleteImage"/>
+                                                    </li>
+                                                </t>
+                                            </ul>
+                                        </div>
+                                    </li>
+                                </t>
+                            </ul>
+                            <t t-if="this.otherAssets.length">
+                                <h3 class="o_bizflow_images_heading" t-esc="this.copy.coverPhotos"/>
+                                <ul class="o_bizflow_list o_bizflow_asset_list">
+                                    <t t-foreach="this.otherAssets" t-as="asset" t-key="asset.id">
+                                        <li class="o_bizflow_asset_item">
+                                            <t t-if="asset.url">
+                                                <img class="o_bizflow_asset_thumb"
+                                                     t-att-src="asset.url"
+                                                     t-att-alt="asset.label || asset.filename || 'image'"/>
+                                            </t>
+                                            <div class="o_bizflow_asset_meta">
+                                                <strong t-esc="asset.label || asset.filename || ('#' + asset.id)"/>
+                                                <span class="muted" t-esc="asset.slot"/>
+                                            </div>
+                                            <button class="secondary o_bizflow_asset_remove"
+                                                    t-att-disabled="this.state.imageBusy"
+                                                    t-on-click="() => this.onDeleteAsset(asset.id)"
+                                                    t-esc="this.copy.deleteImage"/>
+                                        </li>
+                                    </t>
+                                </ul>
+                            </t>
+                            <p class="muted" t-if="this.state.aiMessage" t-esc="this.state.aiMessage"/>
+                        </t>
+
+                        <t t-if="this.state.tab === 'materials'">
+                            <div class="o_bizflow_field">
+                                <label t-esc="this.copy.materialsPrompt"/>
+                                <textarea rows="5"
+                                          t-att-value="this.state.materialsPrompt"
+                                          t-on-input="(ev) => this.onFieldInput('materialsPrompt', ev)"
+                                          t-att-placeholder="this.copy.materialsPromptPh"/>
+                            </div>
+                            <div class="o_bizflow_actions">
+                                <button t-on-click="this.onAnalyzePricing"
+                                        t-att-disabled="this.state.pricingBusy"
+                                        t-esc="this.copy.analyze"/>
+                            </div>
+                            <p class="muted" t-if="this.state.pricingBusy" t-esc="this.copy.analyzingPricing"/>
+                            <p class="muted" t-if="this.state.aiMessage" t-esc="this.state.aiMessage"/>
+
+                            <h3 t-esc="this.copy.linesTitle"/>
+                            <div class="o_bizflow_lines_table">
+                                <div class="o_bizflow_lines_head">
+                                    <span t-esc="this.copy.colDesc"/>
+                                    <span t-esc="this.copy.colQty"/>
+                                    <span t-esc="this.copy.colUnit"/>
+                                    <span t-esc="this.copy.colTotal"/>
+                                    <span t-esc="this.copy.colOrigin"/>
+                                    <span></span>
+                                </div>
+                                <t t-foreach="this.state.proposal.lines" t-as="line" t-key="line.id">
+                                    <div class="o_bizflow_lines_row">
+                                        <input t-att-value="this.lineFieldValue(line, 'name')"
+                                               t-on-focus="(ev) => this.onLineFocus(line, 'name', ev)"
+                                               t-on-input="this.onLineInput"
+                                               t-on-change="(ev) => this.onUpdateLine(line, 'name', ev)"/>
+                                        <span class="o_bizflow_qty_uom">
+                                            <input type="number" step="0.01" min="0"
+                                                   t-att-value="this.lineFieldValue(line, 'quantity')"
+                                                   t-on-focus="(ev) => this.onLineFocus(line, 'quantity', ev)"
+                                                   t-on-input="this.onLineInput"
+                                                   t-on-change="(ev) => this.onUpdateLine(line, 'quantity', ev)"/>
+                                            <input class="uom"
+                                                   t-att-value="this.lineFieldValue(line, 'uom_name')"
+                                                   t-on-focus="(ev) => this.onLineFocus(line, 'uom_name', ev)"
+                                                   t-on-input="this.onLineInput"
+                                                   t-on-change="(ev) => this.onUpdateLine(line, 'uom_name', ev)"/>
+                                        </span>
+                                        <input type="number" step="0.01" min="0"
+                                               class="o_bizflow_price_edit"
+                                               t-att-value="this.lineFieldValue(line, 'price_unit')"
+                                               t-att-title="this.copy.editPriceHint"
+                                               t-on-focus="(ev) => this.onLineFocus(line, 'price_unit', ev)"
+                                               t-on-input="this.onLineInput"
+                                               t-on-change="(ev) => this.onUpdateLine(line, 'price_unit', ev)"/>
+                                        <span class="num" t-esc="this.formatMoney(line.price_subtotal)"/>
+                                        <span class="origin" t-esc="line.notes || line.source || ''"/>
+                                        <button type="button" class="secondary"
+                                                t-on-click="() => this.removeLine(line.id)"
+                                                t-esc="this.copy.deleteImage"/>
+                                    </div>
+                                </t>
+                            </div>
+
+                            <h3 t-esc="this.copy.addManual"/>
+                            <div class="o_bizflow_manual_line">
+                                <input t-att-value="this.state.ownLineName"
+                                       t-on-input="(ev) => this.onFieldInput('ownLineName', ev)"
+                                       t-att-placeholder="this.copy.colDesc"/>
+                                <input type="number" step="0.01"
+                                       t-att-value="this.state.ownLineQty"
+                                       t-on-input="(ev) => this.onFieldInput('ownLineQty', ev)"
+                                       placeholder="Qty"/>
+                                <input t-att-value="this.state.ownLineUom"
+                                       t-on-input="(ev) => this.onFieldInput('ownLineUom', ev)"
+                                       placeholder="uom"/>
+                                <input type="number" step="0.01"
+                                       t-att-value="this.state.ownLinePrice"
+                                       t-on-input="(ev) => this.onFieldInput('ownLinePrice', ev)"
+                                       placeholder="Price"/>
+                                <button t-on-click="this.onAddOwnLine" t-esc="this.copy.addLine"/>
+                            </div>
+
+                            <div class="o_bizflow_field" style="margin-top:16px">
+                                <label t-esc="this.copy.searchSuppliers"/>
+                                <input t-att-value="this.state.materialQuery"
+                                       t-on-input="(ev) => this.onFieldInput('materialQuery', ev)"
+                                       placeholder="e.g. 2x4 stud, paint, tile"/>
+                            </div>
+                            <div class="o_bizflow_actions">
+                                <button class="secondary" t-on-click="this.onSearchMaterials"
+                                        t-esc="this.copy.search"/>
+                            </div>
+                            <ul class="o_bizflow_list">
+                                <t t-foreach="this.state.searchResults" t-as="hit" t-key="hit_index">
+                                    <li>
+                                        <span>
+                                            <strong t-esc="hit.name"/>
+                                            <br/>
+                                            <span t-esc="hit.supplier_name"/> — $<t t-esc="hit.price"/>
+                                        </span>
+                                        <button t-on-click="() => this.addMaterialHit(hit)"
+                                                t-esc="this.copy.addLine"/>
+                                    </li>
+                                </t>
+                            </ul>
+                        </t>
+
+                        <t t-if="this.state.tab === 'utility'">
+                            <p>Project utility is revenue minus costs. Values sync from lines and markups.</p>
+                            <ul class="o_bizflow_list">
+                                <li><span>Total</span><strong t-esc="this.state.proposal.amounts.total"/></li>
+                                <li><span>Cost</span><strong t-esc="this.state.proposal.amounts.cost"/></li>
+                                <li><span>Utility</span><strong t-esc="this.state.proposal.amounts.utility"/></li>
+                                <li><span>Margin %</span><strong t-esc="this.state.proposal.amounts.utility_margin"/></li>
+                            </ul>
+                            <div class="o_bizflow_field">
+                                <label>Utility intro</label>
+                                <textarea rows="4"
+                                          t-att-value="this.state.utilityIntro"
+                                          t-on-input="(ev) => this.onFieldInput('utilityIntro', ev)"/>
+                            </div>
+                            <div class="o_bizflow_actions">
+                                <button t-on-click="this.onSaveUtility">Save utility text</button>
+                                <button class="secondary" t-on-click="this.onSyncUtility">Refresh numbers</button>
+                            </div>
+                        </t>
+
+                        <t t-if="this.state.tab === 'share'">
+                            <p>Access code: <strong t-esc="this.state.proposal.access_code"/></p>
+                            <div class="o_bizflow_actions">
+                                <button t-on-click="this.onRotateCode">New access code</button>
+                                <button class="secondary" t-on-click="this.onToggleAccessRequired">
+                                    <t t-if="this.state.proposal.access_required">Disable code</t>
+                                    <t t-else="">Require code</t>
+                                </button>
+                                <button t-on-click="this.onCreateShare">New client link</button>
+                                <button class="secondary" t-on-click="this.onCreateReviewShare">Review link</button>
+                                <button type="button" t-on-click.stop.prevent="this.onExportPdf"
+                                        t-esc="this.copy.downloadPdf"/>
+                                <button type="button" class="secondary" t-on-click.stop.prevent="this.onExportHtml"
+                                        t-esc="this.copy.exportHtml"/>
+                            </div>
+                            <p class="muted" t-if="this.state.pdfMessage" t-esc="this.state.pdfMessage"/>
+                            <ul class="o_bizflow_list">
+                                <t t-foreach="this.state.proposal.share_links" t-as="link" t-key="link.id">
+                                    <li>
+                                        <span>
+                                            <t t-esc="link.name"/> · <t t-esc="link.purpose"/>
+                                            · views <t t-esc="link.qualified_views || link.views"/>
+                                        </span>
+                                        <a t-att-href="link.url" target="_blank">Open</a>
+                                    </li>
+                                </t>
+                            </ul>
+                            <h3>Comments</h3>
+                            <ul class="o_bizflow_list">
+                                <t t-foreach="this.state.proposal.comments || []" t-as="c" t-key="c.id">
+                                    <li>
+                                        <span>
+                                            <strong t-esc="c.author_name"/>: <t t-esc="c.body"/>
+                                            <span t-if="c.resolved" class="muted"> · resolved</span>
+                                        </span>
+                                    </li>
+                                </t>
+                            </ul>
+                            <h3>Decisions</h3>
+                            <ul class="o_bizflow_list">
+                                <t t-foreach="this.state.proposal.decisions || []" t-as="d" t-key="d.id">
+                                    <li>
+                                        <span><strong t-esc="d.decision"/> — <t t-esc="d.note || d.author_name"/></span>
+                                    </li>
+                                </t>
+                            </ul>
+                        </t>
+
+                        <t t-if="this.state.tab === 'sign'">
+                            <p>Freeze the document and send a signing link. Kickoff must be ≥7 days out.</p>
+                            <div class="o_bizflow_actions">
+                                <button t-on-click="this.onCreateSigning">Create signing link</button>
+                            </div>
+                            <ul class="o_bizflow_list">
+                                <t t-foreach="this.state.proposal.signing || []" t-as="s" t-key="s.id">
+                                    <li>
+                                        <span>
+                                            <t t-esc="s.status"/>
+                                            · co <t t-esc="s.company_signed ? '✓' : '…'"/>
+                                            · cl <t t-esc="s.client_signed ? '✓' : '…'"/>
+                                            <br/><span class="muted" t-esc="s.access_code"/>
+                                        </span>
+                                        <div>
+                                            <a t-att-href="s.url" target="_blank">Open</a>
+                                            <button class="secondary" t-on-click="() => this.onCompanySign(s.id)">Company sign</button>
+                                        </div>
+                                    </li>
+                                </t>
+                            </ul>
+                        </t>
+
+                        <t t-if="this.state.tab === 'costs'">
+                            <p class="muted">Internal only — never shown to the client or in the PDF.</p>
+                            <ul class="o_bizflow_list">
+                                <t t-foreach="this.state.proposal.costs || []" t-as="c" t-key="c.id">
+                                    <li>
+                                        <span><t t-esc="c.name"/> · <t t-esc="c.category"/> · $<t t-esc="c.amount"/></span>
+                                        <button class="secondary" t-on-click="() => this.onDeleteCost(c.id)">Remove</button>
+                                    </li>
+                                </t>
+                            </ul>
+                            <div class="o_bizflow_field">
+                                <label>Cost name</label>
+                                <input t-att-value="this.state.costName"
+                                       t-on-input="(ev) => this.onFieldInput('costName', ev)"/>
+                            </div>
+                            <div class="o_bizflow_field">
+                                <label>Rate</label>
+                                <input type="number" t-att-value="this.state.costRate"
+                                       t-on-input="(ev) => this.onFieldInput('costRate', ev)"/>
+                            </div>
+                            <div class="o_bizflow_field">
+                                <label>Qty</label>
+                                <input type="number" t-att-value="this.state.costQty"
+                                       t-on-input="(ev) => this.onFieldInput('costQty', ev)"/>
+                            </div>
+                            <button t-on-click="this.onAddCost">Add internal cost</button>
+                        </t>
+
+                        <t t-if="this.state.tab === 'history'">
+                            <ul class="o_bizflow_list">
+                                <t t-foreach="this.historyItems" t-as="item" t-key="item.id">
+                                    <li>
+                                        <span>
+                                            <strong t-esc="item.kind"/> · <t t-esc="item.summary || item.section"/>
+                                            <br/><span class="muted" t-esc="item.author"/>
+                                        </span>
+                                        <button t-if="item.restorable" class="secondary"
+                                                t-on-click="() => this.restoreChange(item.id)">Restore</button>
+                                    </li>
+                                </t>
+                            </ul>
+                        </t>
+
+                        <t t-if="this.state.tab === 'design'">
+                            <div class="o_bizflow_field">
+                                <label>Document look</label>
+                                <textarea rows="10"
+                                          t-att-value="this.state.designCss"
+                                          t-on-input="(ev) => this.onFieldInput('designCss', ev)"/>
+                            </div>
+                            <button t-on-click="this.onSaveDesign">Save design</button>
+                        </t>
+                    </aside>
+                    <main class="o_bizflow_editor_preview">
+                        <iframe t-att-srcdoc="this.state.proposal.html"/>
+                    </main>
+                </div>
+            </t>
+        </div>
+    </t>
+</templates>

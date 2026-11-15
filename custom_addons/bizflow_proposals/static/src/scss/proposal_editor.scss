@@ -1,0 +1,520 @@
+.o_bizflow_editor {
+    --bf-ink: #1c2430;
+    --bf-steel: #2f6f8f;
+    --bf-surface: #f7f8fa;
+    --bf-card: #ffffff;
+    --bf-line: #d9dee5;
+    --bf-muted: #5b6572;
+    --bf-accent: #2f6f8f;
+
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background: var(--bf-surface);
+    color: var(--bf-ink);
+    font-family: "Avenir Next", "Segoe UI", "Helvetica Neue", sans-serif;
+}
+
+.o_bizflow_editor_header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: var(--bf-ink);
+    color: #f4f7fa;
+}
+
+.o_bizflow_editor_header h1 {
+    font-size: 16px;
+    margin: 0;
+    flex: 1;
+    font-weight: 600;
+}
+
+.o_bizflow_editor_header .badge {
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
+    border-radius: 6px;
+    padding: 2px 10px;
+    font-size: 12px;
+}
+
+.o_bizflow_editor_header button,
+.o_bizflow_actions button,
+.o_bizflow_tabs button,
+.o_bizflow_list button,
+.o_bizflow_section_list button {
+    border: 1px solid transparent;
+    background: var(--bf-steel);
+    color: #fff;
+    border-radius: 8px;
+    padding: 7px 12px;
+    font-size: 13px;
+    font-family: inherit;
+    cursor: pointer;
+}
+
+.o_bizflow_editor_header button.secondary,
+.o_bizflow_actions button.secondary,
+.o_bizflow_list button.secondary {
+    background: transparent;
+    border-color: rgba(255, 255, 255, 0.35);
+    color: #fff;
+}
+
+.o_bizflow_actions button.secondary,
+.o_bizflow_list button.secondary {
+    border-color: var(--bf-line);
+    color: var(--bf-ink);
+}
+
+.o_bizflow_editor_body,
+.o_bizflow_new {
+    display: grid;
+    grid-template-columns: 440px 1fr;
+    min-height: 0;
+    flex: 1;
+}
+
+.o_bizflow_editor_sidebar {
+    background: var(--bf-card);
+    border-right: 1px solid var(--bf-line);
+    overflow: auto;
+    padding: 14px;
+}
+
+.o_bizflow_editor_preview {
+    overflow: hidden;
+    background: #e8edf2;
+}
+
+.o_bizflow_editor_preview iframe {
+    width: 100%;
+    height: 100%;
+    border: 0;
+    background: white;
+    /* Preview only — blocks click-through when header buttons re-render (e.g. Refresh). */
+    pointer-events: none;
+}
+
+.o_bizflow_editor.o_bizflow_refreshing .o_bizflow_editor_body,
+.o_bizflow_editor.o_bizflow_refreshing .o_bizflow_editor_preview {
+    pointer-events: none;
+}
+
+.o_bizflow_cover_preview {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+}
+
+.o_bizflow_cover_card {
+    width: 100%;
+    max-width: 520px;
+    min-height: 640px;
+    background: linear-gradient(160deg, #1c2430 0%, #2a3a4d 100%);
+    color: #fff;
+    border-radius: 10px;
+    padding: 40px;
+    box-shadow: 0 18px 40px rgba(28, 36, 48, 0.25);
+}
+
+.o_bizflow_cover_card .eyebrow {
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    font-size: 11px;
+    color: #9ec3d8;
+}
+
+.o_bizflow_cover_card h2 {
+    font-family: "Iowan Old Style", "Palatino Linotype", Palatino, serif;
+    font-size: 34px;
+    margin: 18px 0 12px;
+}
+
+.o_bizflow_tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 12px;
+}
+
+.o_bizflow_tabs button {
+    border: 1px solid var(--bf-line);
+    background: #fff;
+    color: var(--bf-ink);
+}
+
+.o_bizflow_tabs button.active {
+    background: var(--bf-ink);
+    color: #fff;
+    border-color: var(--bf-ink);
+}
+
+.o_bizflow_subtabs {
+    margin-top: 8px;
+}
+
+.o_bizflow_section_list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 10px;
+}
+
+.o_bizflow_section_list button {
+    display: flex;
+    justify-content: space-between;
+    background: #fff;
+    color: var(--bf-ink);
+    border: 1px solid var(--bf-line);
+    text-align: left;
+}
+
+.o_bizflow_section_list button.active {
+    border-color: var(--bf-steel);
+    box-shadow: inset 3px 0 0 var(--bf-steel);
+}
+
+.o_bizflow_field {
+    margin-bottom: 12px;
+}
+
+.o_bizflow_field label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 4px;
+    color: var(--bf-muted);
+}
+
+.o_bizflow_field input,
+.o_bizflow_field textarea,
+.o_bizflow_field select,
+.o_bizflow_chat textarea {
+    width: 100%;
+    border: 1px solid var(--bf-line);
+    border-radius: 8px;
+    padding: 8px 10px;
+    font: inherit;
+    background: #fff;
+    color: var(--bf-ink);
+}
+
+.o_bizflow_actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin: 10px 0;
+}
+
+.o_bizflow_list {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 12px;
+}
+
+.o_bizflow_list li {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--bf-line);
+    font-size: 13px;
+}
+
+.o_bizflow_asset_list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 4px;
+}
+
+.o_bizflow_asset_item {
+    justify-content: flex-start !important;
+    align-items: flex-start !important;
+    gap: 12px !important;
+    padding: 10px 0 !important;
+}
+
+.o_bizflow_asset_thumb {
+    width: 96px;
+    height: 72px;
+    object-fit: cover;
+    border-radius: 6px;
+    border: 1px solid var(--bf-line);
+    background: #eef2f6;
+    flex-shrink: 0;
+}
+
+.o_bizflow_asset_meta {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.o_bizflow_asset_meta strong {
+    font-size: 13px;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.o_bizflow_asset_meta {
+    flex: 1;
+}
+
+.o_bizflow_asset_remove {
+    flex-shrink: 0;
+    padding: 5px 10px !important;
+    font-size: 12px !important;
+}
+
+.o_bizflow_images_heading {
+    font-size: 13px;
+    font-weight: 600;
+    margin: 14px 0 8px;
+    color: var(--bf-ink);
+}
+
+.o_bizflow_asset_card {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 8px !important;
+    padding: 12px 0 !important;
+    border-bottom: 1px solid var(--bf-line);
+}
+
+.o_bizflow_asset_card .o_bizflow_asset_item {
+    border-bottom: 0 !important;
+    padding: 0 !important;
+}
+
+.o_bizflow_asset_actions {
+    margin: 0 !important;
+}
+
+.o_bizflow_asset_actions button {
+    width: 100%;
+}
+
+.o_bizflow_after_group {
+    margin-left: 8px;
+    padding: 8px 10px;
+    background: #f3f6f9;
+    border-radius: 8px;
+}
+
+.o_bizflow_after_label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 6px;
+}
+
+.o_bizflow_after_list {
+    margin: 0 !important;
+}
+
+.o_bizflow_after_list .o_bizflow_asset_thumb {
+    width: 72px;
+    height: 54px;
+}
+
+.o_bizflow_progress_indeterminate .bar {
+    width: 40%;
+    animation: o_bizflow_indeterminate 1.2s ease-in-out infinite;
+}
+
+@keyframes o_bizflow_indeterminate {
+    0% {
+        transform: translateX(-120%);
+    }
+    100% {
+        transform: translateX(280%);
+    }
+}
+
+.o_bizflow_empty {
+    padding: 28px;
+}
+
+.o_bizflow_eyebrow {
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    font-size: 11px;
+    color: var(--bf-steel);
+    font-weight: 600;
+}
+
+.o_bizflow_chat_thread {
+    max-height: 280px;
+    overflow: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.o_bizflow_chat .bubble {
+    max-width: 92%;
+    padding: 8px 12px;
+    border-radius: 12px;
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.o_bizflow_chat .bubble p {
+    margin: 0;
+}
+
+.o_bizflow_chat .bubble.user {
+    align-self: flex-end;
+    background: var(--bf-ink);
+    color: #fff;
+}
+
+.o_bizflow_chat .bubble.assistant,
+.o_bizflow_chat .bubble.error {
+    align-self: flex-start;
+    background: #eef3f7;
+    color: var(--bf-ink);
+}
+
+.o_bizflow_chat .bubble.error {
+    background: #fde8e8;
+}
+
+.o_bizflow_overlay {
+    position: absolute;
+    inset: 48px 0 0;
+    background: rgba(28, 36, 48, 0.45);
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.o_bizflow_editor {
+    position: relative;
+}
+
+.o_bizflow_overlay_card {
+    background: #fff;
+    border-radius: 12px;
+    padding: 28px;
+    width: 90%;
+    max-width: 420px;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2);
+}
+
+.o_bizflow_progress {
+    height: 8px;
+    background: #e6ebf0;
+    border-radius: 999px;
+    overflow: hidden;
+    margin: 14px 0 8px;
+}
+
+.o_bizflow_progress .bar {
+    height: 100%;
+    background: var(--bf-steel);
+}
+
+.o_bizflow_conflict {
+    background: #fff6e8;
+    border: 1px solid #f0d9a8;
+    border-radius: 8px;
+    padding: 10px;
+    margin-bottom: 10px;
+}
+
+.muted,
+.text-muted {
+    color: var(--bf-muted);
+    font-size: 12px;
+}
+
+.o_bizflow_lines_table {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 8px 0 14px;
+    font-size: 12px;
+}
+
+.o_bizflow_lines_head,
+.o_bizflow_lines_row {
+    display: grid;
+    grid-template-columns: 1.6fr 0.9fr 0.7fr 0.7fr 1fr auto;
+    gap: 6px;
+    align-items: center;
+}
+
+.o_bizflow_lines_head {
+    font-weight: 600;
+    color: var(--bf-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    font-size: 10px;
+}
+
+.o_bizflow_lines_row input {
+    width: 100%;
+    border: 1px solid var(--bf-line);
+    border-radius: 6px;
+    padding: 5px 7px;
+    font: inherit;
+    background: #fff;
+}
+
+.o_bizflow_lines_row input.o_bizflow_price_edit {
+    font-weight: 600;
+    border-color: #b7c4d0;
+}
+
+.o_bizflow_lines_row input.o_bizflow_price_edit:focus {
+    outline: 2px solid rgba(47, 111, 143, 0.35);
+    border-color: var(--bf-steel);
+}
+
+.o_bizflow_qty_uom {
+    display: flex;
+    gap: 4px;
+}
+
+.o_bizflow_qty_uom .uom {
+    max-width: 52px;
+}
+
+.o_bizflow_lines_row .num {
+    text-align: right;
+    font-weight: 600;
+}
+
+.o_bizflow_lines_row .origin {
+    color: var(--bf-muted);
+    font-size: 11px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.o_bizflow_manual_line {
+    display: grid;
+    grid-template-columns: 1.4fr 0.5fr 0.5fr 0.6fr auto;
+    gap: 6px;
+    margin-bottom: 12px;
+}
+
+.o_bizflow_manual_line input {
+    border: 1px solid var(--bf-line);
+    border-radius: 6px;
+    padding: 6px 8px;
+    font: inherit;
+}

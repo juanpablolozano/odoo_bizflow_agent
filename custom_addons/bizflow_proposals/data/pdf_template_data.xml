@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <record id="pdf_template_default" model="bizflow.pdf.template">
+        <field name="name">Construction Classic</field>
+        <field name="is_default">True</field>
+        <field name="primary_color">#111111</field>
+        <field name="accent_color">#C4A35A</field>
+        <field name="font_family">Helvetica, Arial, sans-serif</field>
+        <field name="header_html"></field>
+        <field name="footer_html"></field>
+        <field name="show_cover_image">True</field>
+        <field name="show_before_after">True</field>
+        <field name="show_utility">False</field>
+    </record>
+    <record id="pdf_template_modern" model="bizflow.pdf.template">
+        <field name="name">Modern Jobsite</field>
+        <field name="primary_color">#0F2C4C</field>
+        <field name="accent_color">#E07A3D</field>
+        <field name="font_family">Helvetica, Arial, sans-serif</field>
+        <field name="sequence">20</field>
+    </record>
+</odoo>

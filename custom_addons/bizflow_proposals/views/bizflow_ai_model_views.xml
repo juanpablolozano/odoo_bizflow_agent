@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_bizflow_ai_model_list" model="ir.ui.view">
+        <field name="name">bizflow.ai.model.list</field>
+        <field name="model">bizflow.ai.model</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="purpose"/>
+                <field name="provider"/>
+                <field name="model_name"/>
+                <field name="active"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_bizflow_ai_model_form" model="ir.ui.view">
+        <field name="name">bizflow.ai.model.form</field>
+        <field name="model">bizflow.ai.model</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <group>
+                        <field name="name"/>
+                        <field name="purpose"/>
+                        <field name="provider"/>
+                        <field name="model_name"/>
+                        <field name="api_base_url"/>
+                        <field name="api_key" password="True"/>
+                        <field name="default_prompt"/>
+                        <field name="extra_params"/>
+                        <field name="active"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="action_bizflow_ai_model" model="ir.actions.act_window">
+        <field name="name">AI models</field>
+        <field name="res_model">bizflow.ai.model</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>
