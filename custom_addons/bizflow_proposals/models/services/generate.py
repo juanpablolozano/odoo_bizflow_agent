@@ -5,6 +5,7 @@ import re
 
 from odoo.addons.bizflow_proposals.models.schema import SECTION_ORDER, normalize_content
 from odoo.addons.bizflow_proposals.models.services import llm
+from odoo.addons.bizflow_proposals.models.services import plan_render
 
 _logger = logging.getLogger(__name__)
 
@@ -22,15 +23,46 @@ GENERATE_SECTIONS = [
 
 
 def _brief_text(proposal):
+    has_plan = bool(
+        proposal.asset_ids.filtered(
+            lambda a: (a.slot or "") == "plan"
+            or (a.mime or "").startswith("application/pdf")
+            or (a.filename or "").lower().endswith(".pdf")
+        )
+    )
+    has_photo = bool(
+        proposal.asset_ids.filtered(lambda a: (a.slot or "") == "before" and a.datas)
+        or proposal.before_image
+    )
     parts = [
         f"Language: {proposal.language or 'es'}",
         f"Client: {proposal.partner_id.display_name or proposal.name}",
         f"Project type: {proposal.project_type or ''}",
         f"Location: {proposal.location or ''}",
+        f"Attached site photos: {'yes' if has_photo else 'no'}",
+        f"Attached plan/PDF: {'yes' if has_plan else 'no'}",
         f"WHAT THE PROJECT IS ABOUT:\n{proposal.brief or proposal.description or ''}",
         f"WHAT MUST BE BUILT / SCOPE NOTES:\n{proposal.work_brief or ''}",
     ]
+    if has_plan or has_photo:
+        parts.append(
+            "Use the attached images (photos and/or plan pages) to infer materials, "
+            "quantities, timeline, and budget notes. Prefer visible measurements on the plan."
+        )
     return "\n\n".join(parts)
+
+
+def _generate_user_message(proposal, extra_instructions=""):
+    text = _brief_text(proposal)
+    if extra_instructions:
+        text = f"{text}\n\nEXTRA INSTRUCTIONS:\n{extra_instructions}"
+    urls = plan_render.vision_data_urls_for_proposal(proposal, max_images=8)
+    if not urls:
+        return {"role": "user", "content": text}
+    content = [{"type": "text", "text": text}]
+    for url in urls[:8]:
+        content.append({"type": "image_url", "image_url": {"url": url}})
+    return {"role": "user", "content": content}
 
 
 def _system_prompt(language):
@@ -185,10 +217,8 @@ def generate_proposal(proposal, extra_instructions="", on_progress=None):
         try:
             messages = [
                 {"role": "system", "content": _system_prompt(proposal.language)},
-                {"role": "user", "content": _brief_text(proposal)},
+                _generate_user_message(proposal, extra_instructions),
             ]
-            if extra_instructions:
-                messages.append({"role": "user", "content": f"EXTRA INSTRUCTIONS:\n{extra_instructions}"})
             progress(15, "description")
             raw = llm.chat_completion(model, messages, response_json=True, timeout=180)
             progress(70, "pricing")

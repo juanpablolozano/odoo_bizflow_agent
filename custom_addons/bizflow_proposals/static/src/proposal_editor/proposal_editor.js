@@ -1,6 +1,15 @@
 /** @odoo-module **/
 
-import { Component, onWillStart, onWillUnmount, proxy, useProps } from "@odoo/owl";
+import {
+    Component,
+    onMounted,
+    onPatched,
+    onWillStart,
+    onWillUnmount,
+    proxy,
+    signal,
+    useProps,
+} from "@odoo/owl";
 import { registry } from "@web/core/registry";
 import { rpc } from "@web/core/network/rpc";
 import { standardActionServiceProps } from "@web/webclient/actions/action_plugin";
@@ -60,14 +69,18 @@ export class ProposalEditorAction extends Component {
         ...standardActionServiceProps,
     });
 
+    previewRef = signal.ref();
+
     setup() {
         this.state = proxy({
             list: [],
             proposal: null,
             mode: "list", // list | new | edit
             tab: "sections",
+            activeSection: null, // null = section list; key = drill-down
             sectionKey: "cover",
             sectionMode: "chat", // chat | edit | images
+            fromPreview: false,
             form: {},
             language: "es",
             clientName: "",
@@ -75,6 +88,8 @@ export class ProposalEditorAction extends Component {
             workBrief: "",
             projectType: "",
             location: "",
+            pendingPhotos: [],
+            pendingPlans: [],
             creating: false,
             chatInput: "",
             chatMessages: [],
@@ -83,7 +98,12 @@ export class ProposalEditorAction extends Component {
             imageBusy: false,
             materialQuery: "",
             searchResults: [],
+            searchGroups: [],
+            searchBusy: false,
+            selectedSearchKey: "",
             materialsPrompt: "",
+            materialsReportMode: "detailed_prices",
+            pricingReview: null,
             ownLineName: "",
             ownLineQty: "1",
             ownLineUom: "unit",
@@ -107,6 +127,7 @@ export class ProposalEditorAction extends Component {
             costRate: "0",
             costQty: "1",
         });
+        this._previewWired = false;
         onWillStart(async () => {
             const params = this.props.action?.params || {};
             if (params.proposal_id) {
@@ -114,6 +135,11 @@ export class ProposalEditorAction extends Component {
             } else {
                 await this.loadList();
             }
+        });
+        onMounted(() => this._wirePreview());
+        onPatched(() => {
+            this._wirePreview();
+            this._syncPreviewActive();
         });
         onWillUnmount(() => this._stopPoll());
     }
@@ -162,19 +188,44 @@ export class ProposalEditorAction extends Component {
                 linesTitle: "Líneas",
                 colDesc: "Descripción",
                 colQty: "Cant.",
+                colUom: "UoM",
                 colUnit: "Unitario",
                 colTotal: "Total",
-                colOrigin: "Origen",
+                colSupplier: "Proveedor",
+                reportModeLabel: "Cómo se muestra al cliente",
+                reportModePrices: "Ítems con precios",
+                reportModeNoPrices: "Ítems sin precios (nombre + cant.)",
+                reportModeTotal: "Solo total de materiales",
+                reviewPricing: "Revisar precios",
+                applyPricing: "Agregar todos",
+                cancelReview: "Cancelar",
+                noVerifiedPrice: "Sin precio en retailer — busca o edita a mano (cantidad ya estimada)",
+                referentialPrice: "Referencial",
+                recommended: "Recomendado",
+                laborTitle: "Mano de obra",
+                laborTrades: "Oficios / mano de obra",
+                laborHours: "horas",
+                previewTotals: "Total estimado del review",
+                addCandidate: "Agregar a líneas",
+                skipCandidate: "Descartar",
+                allSections: "Todas las secciones",
+                cheapest: "más barato",
                 addManual: "Agregar material manual",
                 addLine: "Agregar",
                 searchSuppliers: "Buscar proveedores",
                 search: "Buscar",
+                searching: "Buscando…",
+                noSearchHits: "Sin resultados. Prueba otros términos.",
+                openUrl: "Ver producto",
                 downloadPdf: "Descargar PDF",
                 exportHtml: "Exportar HTML",
                 pdfBusy: "Generando PDF…",
                 pdfFailed: "No se pudo generar el PDF. Usa imprimir del navegador o instala Chrome.",
                 editPriceHint: "Editable siempre — también si vino de IA o proveedor",
-                noTech: "Sin JSON: edita campos o habla con la IA.",
+                sitePhotos: "Fotos del sitio",
+                sitePhotosHint: "Para identificar materiales y el alcance visual (before).",
+                planPdf: "Plano / PDF",
+                planPdfHint: "Para cantidades, materiales, tiempos y presupuesto desde el plano.",
             };
         }
         return {
@@ -218,19 +269,44 @@ export class ProposalEditorAction extends Component {
             linesTitle: "Lines",
             colDesc: "Description",
             colQty: "Qty",
+            colUom: "UoM",
             colUnit: "Unit",
             colTotal: "Total",
-            colOrigin: "Source",
+            colSupplier: "Supplier",
+            reportModeLabel: "How it shows to the client",
+            reportModePrices: "Items with prices",
+            reportModeNoPrices: "Items without prices (name + qty)",
+            reportModeTotal: "Materials total only",
+            reviewPricing: "Review prices",
+            applyPricing: "Add all",
+            cancelReview: "Cancel",
+            noVerifiedPrice: "No retailer price — search or edit by hand (qty already estimated)",
+            referentialPrice: "Referential",
+            recommended: "Recommended",
+            laborTitle: "Labor",
+            laborTrades: "Trades / labor",
+            laborHours: "hours",
+            previewTotals: "Estimated review total",
+            addCandidate: "Add to lines",
+            skipCandidate: "Dismiss",
+            allSections: "All sections",
+            cheapest: "cheapest",
             addManual: "Add manual material",
             addLine: "Add",
             searchSuppliers: "Search suppliers",
             search: "Search",
+            searching: "Searching…",
+            noSearchHits: "No results. Try different terms.",
+            openUrl: "Open product",
             downloadPdf: "Download PDF",
             exportHtml: "Export HTML",
             pdfBusy: "Generating PDF…",
             pdfFailed: "PDF export failed. Use browser print or install Chrome.",
             editPriceHint: "Always editable — including AI or provider prices",
-            noTech: "No JSON: edit fields or chat with AI.",
+            sitePhotos: "Site photos",
+            sitePhotosHint: "Used to identify materials and visual scope (before).",
+            planPdf: "Plan / PDF",
+            planPdfHint: "Used for quantities, materials, timeline, and budget from the drawing.",
         };
     }
 
@@ -274,6 +350,15 @@ export class ProposalEditorAction extends Component {
         return SECTION_FIELDS[this.state.sectionKey] || [];
     }
 
+    get activeSectionLabel() {
+        const key = this.state.activeSection;
+        if (!key) {
+            return "";
+        }
+        const labels = this.state.proposal?.section_labels || {};
+        return labels[key] || key;
+    }
+
     get isGenerating() {
         const g = this.state.proposal?.generation;
         return g && g.status === "running";
@@ -286,6 +371,14 @@ export class ProposalEditorAction extends Component {
     formatMoney(value) {
         const n = Number(value || 0);
         return `$${n.toFixed(2)}`;
+    }
+
+    formatQty(value) {
+        const n = Number(value || 0);
+        if (Number.isInteger(n)) {
+            return String(n);
+        }
+        return String(Math.round(n * 100) / 100);
     }
 
     onFieldInput(field, ev) {
@@ -313,18 +406,118 @@ export class ProposalEditorAction extends Component {
         this.state.clientName = "";
         this.state.projectType = "";
         this.state.location = "";
+        this.state.pendingPhotos = [];
+        this.state.pendingPlans = [];
         this._stopPoll();
     }
 
-    async openProposal(id) {
+    onPendingPhotos(ev) {
+        const files = ev.target.files ? [...ev.target.files] : [];
+        if (!files.length) {
+            return;
+        }
+        this.state.pendingPhotos = [...this.state.pendingPhotos, ...files];
+        ev.target.value = "";
+    }
+
+    onPendingPlans(ev) {
+        const files = ev.target.files ? [...ev.target.files] : [];
+        if (!files.length) {
+            return;
+        }
+        this.state.pendingPlans = [...this.state.pendingPlans, ...files];
+        ev.target.value = "";
+    }
+
+    removePendingPhoto(index) {
+        this.state.pendingPhotos = this.state.pendingPhotos.filter((_f, i) => i !== index);
+    }
+
+    removePendingPlan(index) {
+        this.state.pendingPlans = this.state.pendingPlans.filter((_f, i) => i !== index);
+    }
+
+    async _uploadPendingAssets(proposalId) {
+        const photos = [...(this.state.pendingPhotos || [])];
+        const plans = [...(this.state.pendingPlans || [])];
+        let lastProposal = null;
+        for (const file of photos) {
+            const datas = await this._fileToDataUrl(file);
+            const result = await rpc(`/bizflow/proposals/${proposalId}/assets`, {
+                datas,
+                filename: file.name,
+                mime: file.type || "image/jpeg",
+                label: file.name,
+                slot: "before",
+            });
+            if (result.error) {
+                throw new Error(result.message || result.error);
+            }
+            if (result.proposal) {
+                lastProposal = result.proposal;
+            }
+        }
+        for (const file of plans) {
+            const datas = await this._fileToDataUrl(file);
+            const result = await rpc(`/bizflow/proposals/${proposalId}/assets`, {
+                datas,
+                filename: file.name,
+                mime: file.type || "application/pdf",
+                label: file.name,
+                slot: "plan",
+            });
+            if (result.error) {
+                throw new Error(result.message || result.error);
+            }
+            if (result.proposal) {
+                lastProposal = result.proposal;
+            }
+        }
+        this.state.pendingPhotos = [];
+        this.state.pendingPlans = [];
+        return lastProposal;
+    }
+
+    async openProposal(id, opts = {}) {
         const data = await this._httpGet(`/bizflow/proposals/${id}`);
-        this._applyProposal(data);
+        this._applyProposal(data, opts);
         this.state.mode = "edit";
+        if (!opts.preferMaterialsReview) {
+            this.state.tab = "sections";
+            this.state.activeSection = null;
+        }
         await this._loadChat("");
         this._startPoll();
     }
 
-    _applyProposal(data) {
+    _hydratePricingReviewFromContent(data) {
+        const review = data?.content?.pricing?.last_review;
+        if (!review || review === false || !Array.isArray(review.candidates)) {
+            return false;
+        }
+        const laborItems = (review.labor_items || []).map((li, i) => ({
+            included: true,
+            ...li,
+            id: li.id || `labor-${i}`,
+        }));
+        const labor =
+            laborItems.length > 0
+                ? null
+                : review.labor
+                  ? { included: true, ...review.labor }
+                  : null;
+        this.state.pricingReview = {
+            candidates: (review.candidates || []).map((c) => this._normalizeCandidate(c)),
+            labor,
+            labor_items: laborItems,
+            exclusions: review.exclusions || [],
+            assumptions: review.assumptions || [],
+            totals: review.totals || {},
+        };
+        return (review.candidates || []).length > 0 || laborItems.length > 0 || Boolean(labor);
+    }
+
+    _applyProposal(data, opts = {}) {
         this.state.proposal = data;
         this.state.lastGenerationStatus = data.generation?.status || "idle";
         this.state.language = data.language || "es";
@@ -335,6 +528,14 @@ export class ProposalEditorAction extends Component {
         this.state.afterNotes = (data.content && data.content.before_after && data.content.before_after.notes) || "";
         const savedPrompt = data.content?.pricing?.materials_prompt || "";
         this.state.materialsPrompt = savedPrompt || this._defaultMaterialsPrompt(data);
+        this.state.materialsReportMode = data.materials_report_mode || "detailed_prices";
+        if (opts.preferMaterialsReview) {
+            const ok = this._hydratePricingReviewFromContent(data);
+            if (ok) {
+                this.state.tab = "materials";
+                this.state.aiMessage = this.copy.reviewPricing;
+            }
+        }
     }
 
     _defaultMaterialsPrompt(data) {
@@ -368,6 +569,9 @@ export class ProposalEditorAction extends Component {
 
     setTab(tab) {
         this.state.tab = tab;
+        if (tab === "materials" && !this.state.pricingReview && this.state.proposal) {
+            this._hydratePricingReviewFromContent(this.state.proposal);
+        }
         if (tab === "ai") {
             this._loadChat("");
         }
@@ -376,14 +580,32 @@ export class ProposalEditorAction extends Component {
         }
     }
 
-    selectSection(key) {
+    openSection(key, fromPreview = false) {
+        this.state.activeSection = key;
         this.state.sectionKey = key;
         this.state.sectionMode = "chat";
+        this.state.fromPreview = !!fromPreview;
         this._loadFormFromSection(key);
         this._loadChat(key);
         if (this.state.proposal) {
             rpc(`/bizflow/proposals/${this.state.proposal.id}/state`, { section: key }).catch(() => {});
         }
+        this._syncPreviewActive();
+    }
+
+    /** @deprecated use openSection */
+    selectSection(key) {
+        this.openSection(key, false);
+    }
+
+    backToSectionList() {
+        this.state.activeSection = null;
+        this.state.fromPreview = false;
+        this._syncPreviewActive();
+    }
+
+    onProductLinkClick() {
+        // Modifier .stop keeps radio/label from stealing the click; browser opens target=_blank.
     }
 
     setSectionMode(mode) {
@@ -393,15 +615,86 @@ export class ProposalEditorAction extends Component {
         }
     }
 
+    _previewDoc() {
+        const iframe = this.previewRef?.();
+        try {
+            return iframe?.contentDocument || null;
+        } catch (_err) {
+            return null;
+        }
+    }
+
+    _ensurePreviewClick(iframe) {
+        let doc;
+        try {
+            doc = iframe?.contentDocument || null;
+        } catch (_err) {
+            doc = null;
+        }
+        if (!doc || doc._bfPreviewClick) {
+            this._syncPreviewActive();
+            return;
+        }
+        doc._bfPreviewClick = true;
+        doc.addEventListener("click", (ev) => {
+            const node = ev.target?.closest?.("[data-section]");
+            const key = node?.getAttribute("data-section");
+            if (!key) {
+                return;
+            }
+            ev.preventDefault();
+            this.state.tab = "sections";
+            this.openSection(key, true);
+        });
+        this._syncPreviewActive();
+    }
+
+    _wirePreview() {
+        const iframe = this.previewRef?.();
+        if (!iframe) {
+            return;
+        }
+        // OWL may recreate the iframe node; re-bind load + click for the current element/doc.
+        if (this._previewIframeEl !== iframe) {
+            this._previewIframeEl = iframe;
+            iframe.addEventListener("load", () => this._ensurePreviewClick(iframe));
+        }
+        this._ensurePreviewClick(iframe);
+        setTimeout(() => this._ensurePreviewClick(iframe), 50);
+    }
+
+    _syncPreviewActive() {
+        const doc = this._previewDoc();
+        if (!doc) {
+            return;
+        }
+        doc.querySelectorAll("[data-section].bf-active").forEach((n) => n.classList.remove("bf-active"));
+        const key = this.state.activeSection;
+        if (!key) {
+            return;
+        }
+        const nodes = doc.querySelectorAll(`[data-section="${key}"]`);
+        nodes.forEach((n) => n.classList.add("bf-active"));
+        if (nodes.length && !this.state.fromPreview) {
+            nodes[0].scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+        this.state.fromPreview = false;
+    }
+
     async onCreateProposal(withAi) {
         if (this.state.creating) {
             return;
         }
         this.state.creating = true;
+        this.state.pricingReview = null;
+        this.state.aiMessage = "";
         try {
             const name =
                 this.state.clientName.trim() ||
                 (this.state.language === "es" ? "Nueva propuesta de obra" : "New construction proposal");
+            const hasPending =
+                (this.state.pendingPhotos || []).length > 0 || (this.state.pendingPlans || []).length > 0;
+            // Create first without AI when files are staged so generation sees photos/plan.
             const data = await rpc("/bizflow/proposals", {
                 name,
                 brief: this.state.brief,
@@ -410,13 +703,30 @@ export class ProposalEditorAction extends Component {
                 project_type: this.state.projectType,
                 location: this.state.location,
                 language: this.state.language,
-                write_with_ai: !!withAi,
+                write_with_ai: !!withAi && !hasPending,
             });
             this._applyProposal(data);
             this.state.mode = "edit";
             this.state.tab = "sections";
+            if (hasPending && data?.id) {
+                const afterUpload = await this._uploadPendingAssets(data.id);
+                if (afterUpload) {
+                    this._applyProposal(afterUpload);
+                } else {
+                    await this.openProposal(data.id);
+                }
+                if (withAi) {
+                    await rpc(`/bizflow/proposals/${data.id}/generate`, {
+                        message: "Write the full proposal from the description, photos, and plan.",
+                    });
+                    this._startPoll();
+                    await this.onRefresh();
+                }
+            }
             await this._loadChat("");
             this._startPoll();
+        } catch (err) {
+            this.state.aiMessage = String(err?.message || err || "Create failed");
         } finally {
             this.state.creating = false;
         }
@@ -520,14 +830,48 @@ export class ProposalEditorAction extends Component {
     }
 
     async onSearchMaterials() {
-        const result = await rpc("/bizflow/materials/search", {
-            query: this.state.materialQuery,
-            limit: 20,
-        });
-        this.state.searchResults = result.items || [];
+        const q = (this.state.materialQuery || "").trim();
+        if (!q || this.state.searchBusy) {
+            return;
+        }
+        this.state.searchBusy = true;
+        this.state.aiMessage = this.copy.searching;
+        try {
+            const result = await rpc("/bizflow/materials/search", {
+                query: q,
+                limit: 20,
+                location: this.state.proposal?.location || "",
+            });
+            this.state.searchResults = result.items || [];
+            this.state.searchGroups = result.groups || [];
+            this.state.selectedSearchKey = "";
+            this.state.aiMessage = (result.items || []).length
+                ? ""
+                : this.copy.noSearchHits;
+        } catch (err) {
+            this.state.aiMessage = String(err?.message || err || "Search failed");
+            this.state.searchResults = [];
+            this.state.searchGroups = [];
+        } finally {
+            this.state.searchBusy = false;
+        }
+    }
+
+    searchHitKey(hit, index) {
+        return `${hit.supplier_id || 0}-${index}-${hit.url || hit.name || ""}`;
+    }
+
+    selectSearchHit(key) {
+        this.state.selectedSearchKey = key;
     }
 
     async addMaterialHit(hit) {
+        if (this._lineAlreadyHasUrl(hit.url)) {
+            this.state.searchResults = (this.state.searchResults || []).filter(
+                (h) => (h.url || "") !== (hit.url || "")
+            );
+            return;
+        }
         let materialId = hit.material_id;
         if (!materialId) {
             const imported = await rpc("/bizflow/materials/import", {
@@ -542,15 +886,33 @@ export class ProposalEditorAction extends Component {
         const data = await rpc(`/bizflow/proposals/${this.state.proposal.id}/lines`, {
             name: hit.name,
             line_type: "material",
-            quantity: 1,
+            quantity: Number(hit.quantity || 1),
+            uom_name: hit.uom || "unit",
             price_unit: hit.price || 0,
             cost_unit: hit.price || 0,
             supplier_id: hit.supplier_id || false,
             material_id: materialId || false,
-            source: hit.source === "manual" ? "manual" : "provider",
+            source: "provider",
             product_url: hit.url || "",
+            notes: "",
         });
         this._applyProposal(data);
+        const hitUrl = (hit.url || "").trim();
+        this.state.searchResults = (this.state.searchResults || []).filter(
+            (h) => (h.url || "").trim() !== hitUrl || (!hitUrl && h !== hit)
+        );
+        this.state.searchGroups = (this.state.searchGroups || [])
+            .map((g) => ({
+                ...g,
+                items: (g.items || []).filter(
+                    (h) => (h.url || "").trim() !== hitUrl || (!hitUrl && h !== hit)
+                ),
+            }))
+            .filter((g) => (g.items || []).length);
+        if (this.state.selectedSearchKey && this.state.selectedSearchKey.includes(hitUrl)) {
+            this.state.selectedSearchKey = "";
+        }
+        this.state.aiMessage = "";
     }
 
     async onAddOwnLine() {
@@ -562,7 +924,7 @@ export class ProposalEditorAction extends Component {
             price_unit: Number(this.state.ownLinePrice || 0),
             cost_unit: Number(this.state.ownLinePrice || 0),
             source: "manual",
-            notes: "manual",
+            notes: "",
         });
         this._applyProposal(data);
         this.state.ownLineName = "";
@@ -571,11 +933,23 @@ export class ProposalEditorAction extends Component {
         this.state.ownLinePrice = "0";
     }
 
+    async onReportModeChange(ev) {
+        const mode = ev.target.value;
+        this.state.materialsReportMode = mode;
+        const data = await rpc(`/bizflow/proposals/${this.state.proposal.id}/meta`, {
+            materials_report_mode: mode,
+        });
+        this._applyProposal(data);
+    }
+
     lineFieldValue(line, field) {
         if (this.state.editingLineId === line.id && this.state.editingField === field) {
             return this.state.editingValue;
         }
         const raw = line?.[field];
+        if (field === "quantity" && raw !== "" && raw !== false && raw !== undefined && raw !== null) {
+            return this.formatQty(raw);
+        }
         return raw === false || raw === undefined || raw === null ? "" : raw;
     }
 
@@ -597,13 +971,7 @@ export class ProposalEditorAction extends Component {
         if (field === "quantity" || field === "price_unit" || field === "cost_unit") {
             value = Number(value || 0);
         }
-        // Any user edit becomes manual so Analizar keeps it and price stays editable.
-        let notes = line.notes || "";
-        if (field === "price_unit" || field === "quantity" || field === "name" || field === "uom_name") {
-            if (!notes.toLowerCase().includes("manual")) {
-                notes = notes ? `manual · ${notes}` : "manual";
-            }
-        }
+        // User edits become source=manual so Analizar keeps them; notes stay off the client report.
         const payload = {
             id: line.id,
             name: line.name,
@@ -616,7 +984,7 @@ export class ProposalEditorAction extends Component {
             material_id: line.material_id || false,
             source: "manual",
             product_url: line.product_url || "",
-            notes,
+            notes: "",
             [field]: value,
         };
         if (field === "price_unit") {
@@ -648,9 +1016,281 @@ export class ProposalEditorAction extends Component {
         }
         this.state.pricingBusy = true;
         this.state.aiMessage = this.copy.analyzingPricing;
+        this.state.pricingReview = null;
         try {
             const result = await rpc(`/bizflow/proposals/${this.state.proposal.id}/ai/pricing`, {
                 materials_prompt: this.state.materialsPrompt || "",
+                apply: false,
+            });
+            if (result.error) {
+                this.state.aiMessage = result.message || result.error;
+                return;
+            }
+            if (result.preview && result.candidates) {
+                const laborItems = (result.labor_items || []).map((li, i) => ({
+                    included: true,
+                    ...li,
+                    id: li.id || `labor-${i}`,
+                }));
+                const labor =
+                    laborItems.length > 0
+                        ? null
+                        : { included: true, ...(result.labor || {}) };
+                this.state.pricingReview = {
+                    candidates: (result.candidates || []).map((c) => this._normalizeCandidate(c)),
+                    labor,
+                    labor_items: laborItems,
+                    exclusions: result.exclusions || [],
+                    assumptions: result.assumptions || [],
+                    totals: result.totals || {},
+                };
+                this.state.aiMessage = result.message || this.copy.reviewPricing;
+                return;
+            }
+            if (result.proposal) {
+                this._applyProposal(result.proposal);
+            }
+            this.state.aiMessage = result.message || "Pricing updated";
+        } catch (err) {
+            this.state.aiMessage = String(err?.message || err || "Pricing failed");
+        } finally {
+            this.state.pricingBusy = false;
+        }
+    }
+
+    _normalizeCandidate(cand) {
+        const options = [...(cand.options || [])].sort(
+            (a, b) => Number(a.price || 0) - Number(b.price || 0)
+        );
+        if (options.length && !options.some((o) => o.recommended)) {
+            options[0] = { ...options[0], recommended: true };
+        }
+        let selectedKey = cand.selected_key || "";
+        if (options.length && !options.some((o) => o.key === selectedKey)) {
+            selectedKey = (options.find((o) => o.recommended) || options[0]).key;
+        }
+        return { ...cand, options, selected_key: selectedKey };
+    }
+
+    onSelectCandidateOption(candidateId, optionKey) {
+        const review = this.state.pricingReview;
+        if (!review) {
+            return;
+        }
+        this.state.pricingReview = {
+            ...review,
+            candidates: (review.candidates || []).map((c) =>
+                c.id === candidateId ? { ...c, selected_key: optionKey } : c
+            ),
+        };
+    }
+
+    onToggleLaborIncluded() {
+        const review = this.state.pricingReview;
+        if (!review?.labor) {
+            return;
+        }
+        this.state.pricingReview = {
+            ...review,
+            labor: { ...review.labor, included: !review.labor.included },
+        };
+    }
+
+    cancelPricingReview() {
+        this.state.pricingReview = null;
+        this.state.aiMessage = "";
+    }
+
+    _chosenOption(cand) {
+        const options = cand.options || [];
+        return (
+            options.find((o) => o.key === cand.selected_key) ||
+            options.find((o) => o.recommended) ||
+            options[0] ||
+            null
+        );
+    }
+
+    _lineAlreadyHasUrl(url) {
+        const needle = (url || "").trim();
+        if (!needle) {
+            return false;
+        }
+        return (this.state.proposal?.lines || []).some((l) => (l.product_url || "").trim() === needle);
+    }
+
+    async addPricingCandidate(cand) {
+        if (!this.state.proposal || this.state.pricingBusy) {
+            return;
+        }
+        const chosen = this._chosenOption(cand);
+        if (!chosen || !(chosen.url || "").startsWith("http") || !(chosen.price > 0)) {
+            this.state.aiMessage = this.copy.noVerifiedPrice;
+            return;
+        }
+        if (this._lineAlreadyHasUrl(chosen.url)) {
+            this._removeCandidateFromReview(cand.id);
+            return;
+        }
+        const isRef = Boolean(chosen.estimated || chosen.source === "referential");
+        this.state.pricingBusy = true;
+        try {
+            const data = await rpc(`/bizflow/proposals/${this.state.proposal.id}/lines`, {
+                name: chosen.name || cand.name,
+                line_type: "material",
+                quantity: Number(cand.quantity || 1),
+                uom_name: cand.uom || "unit",
+                price_unit: chosen.price || 0,
+                cost_unit: chosen.price || 0,
+                supplier_id: chosen.supplier_id || false,
+                source: isRef ? "import" : "provider",
+                product_url: chosen.url || "",
+                notes: isRef ? "referential" : "",
+            });
+            this._applyProposal(data);
+            this._removeCandidateFromReview(cand.id);
+            this.state.aiMessage = "";
+        } catch (err) {
+            this.state.aiMessage = String(err?.message || err || "Add failed");
+        } finally {
+            this.state.pricingBusy = false;
+        }
+    }
+
+    dismissPricingCandidate(candId) {
+        this._removeCandidateFromReview(candId);
+    }
+
+    _removeCandidateFromReview(candId) {
+        const review = this.state.pricingReview;
+        if (!review) {
+            return;
+        }
+        const candidates = (review.candidates || []).filter((c) => c.id !== candId);
+        const left = { ...review, candidates };
+        this.state.pricingReview =
+            candidates.length || (left.labor_items || []).length || left.labor ? left : null;
+    }
+
+    get pricingReviewTotals() {
+        const review = this.state.pricingReview;
+        if (!review) {
+            return null;
+        }
+        if (review.totals && (review.totals.grand || review.totals.materials || review.totals.labor)) {
+            return review.totals;
+        }
+        let materials = 0;
+        for (const c of review.candidates || []) {
+            const chosen = this._chosenOption(c);
+            if (chosen) {
+                materials += Number(chosen.price || 0) * Number(c.quantity || 1);
+            }
+        }
+        let labor = 0;
+        for (const li of review.labor_items || []) {
+            labor += Number(li.total || 0);
+        }
+        if (review.labor) {
+            labor += Number(review.labor.total || 0);
+        }
+        return { materials, labor, grand: materials + labor };
+    }
+
+    async addPricingLabor(laborItem = null) {
+        const review = this.state.pricingReview;
+        const labor = laborItem || review?.labor;
+        if (!this.state.proposal || !labor || this.state.pricingBusy) {
+            return;
+        }
+        this.state.pricingBusy = true;
+        try {
+            const data = await rpc(`/bizflow/proposals/${this.state.proposal.id}/lines`, {
+                name: labor.name || this.copy.laborTitle,
+                line_type: "labor",
+                quantity: Number(labor.hours || 1),
+                uom_name: labor.uom || "hour",
+                price_unit: Number(labor.hourly_rate || labor.total || 0),
+                cost_unit: Number(labor.hourly_rate || labor.total || 0),
+                source: "import",
+                product_url: "",
+                notes: labor.trade || "",
+            });
+            this._applyProposal(data);
+            if (laborItem?.id) {
+                const laborItems = (review.labor_items || []).filter((x) => x.id !== laborItem.id);
+                const left = {
+                    ...review,
+                    labor_items: laborItems,
+                    labor: laborItems.length ? null : null,
+                    candidates: review.candidates || [],
+                };
+                this.state.pricingReview =
+                    left.candidates.length || (left.labor_items || []).length ? left : null;
+            } else {
+                const left = {
+                    ...review,
+                    labor: null,
+                    candidates: review.candidates || [],
+                };
+                this.state.pricingReview =
+                    left.candidates.length || (left.labor_items || []).length ? left : null;
+            }
+            this.state.aiMessage = "";
+        } catch (err) {
+            this.state.aiMessage = String(err?.message || err || "Add labor failed");
+        } finally {
+            this.state.pricingBusy = false;
+        }
+    }
+
+    dismissPricingLabor(laborId = null) {
+        const review = this.state.pricingReview;
+        if (!review) {
+            return;
+        }
+        let left;
+        if (laborId) {
+            left = {
+                ...review,
+                labor_items: (review.labor_items || []).filter((x) => x.id !== laborId),
+            };
+        } else {
+            left = { ...review, labor: null };
+        }
+        this.state.pricingReview =
+            (left.candidates || []).length || (left.labor_items || []).length || left.labor
+                ? left
+                : null;
+    }
+
+    onToggleLaborItemIncluded(laborId) {
+        const review = this.state.pricingReview;
+        if (!review?.labor_items) {
+            return;
+        }
+        this.state.pricingReview = {
+            ...review,
+            labor_items: review.labor_items.map((li) =>
+                li.id === laborId ? { ...li, included: !li.included } : li
+            ),
+        };
+    }
+
+    async onApplyPricingReview() {
+        const review = this.state.pricingReview;
+        if (!this.state.proposal || !review || this.state.pricingBusy) {
+            return;
+        }
+        this.state.pricingBusy = true;
+        try {
+            const result = await rpc(`/bizflow/proposals/${this.state.proposal.id}/ai/pricing`, {
+                apply: true,
+                materials_prompt: this.state.materialsPrompt || "",
+                candidates: review.candidates,
+                labor: review.labor,
+                labor_items: review.labor_items,
+                exclusions: review.exclusions,
             });
             if (result.error) {
                 this.state.aiMessage = result.message || result.error;
@@ -658,12 +1298,11 @@ export class ProposalEditorAction extends Component {
             }
             if (result.proposal) {
                 this._applyProposal(result.proposal);
-            } else if (result.html) {
-                this.state.proposal.html = result.html;
             }
-            this.state.aiMessage = result.message || "Pricing updated";
+            this.state.pricingReview = null;
+            this.state.aiMessage = result.message || "Pricing applied";
         } catch (err) {
-            this.state.aiMessage = String(err?.message || err || "Pricing failed");
+            this.state.aiMessage = String(err?.message || err || "Apply failed");
         } finally {
             this.state.pricingBusy = false;
         }
@@ -855,7 +1494,15 @@ export class ProposalEditorAction extends Component {
         const data = await this._httpGet(
             `/bizflow/proposals/${this.state.proposal.id}/chat?thread=${encodeURIComponent(thread || "")}`
         );
-        this.state.chatMessages = (data.messages || []).filter((m) => m.role !== "reset");
+        const msgs = data.messages || [];
+        let start = 0;
+        for (let i = msgs.length - 1; i >= 0; i--) {
+            if (msgs[i].role === "reset") {
+                start = i + 1;
+                break;
+            }
+        }
+        this.state.chatMessages = msgs.slice(start).filter((m) => m.role !== "reset");
     }
 
     async sendChat() {
@@ -912,12 +1559,18 @@ export class ProposalEditorAction extends Component {
             let lastProposal = null;
             for (const file of files) {
                 const datas = await this._fileToDataUrl(file);
+                const isPdf =
+                    (file.type || "").includes("pdf") ||
+                    String(file.name || "")
+                        .toLowerCase()
+                        .endsWith(".pdf");
+                const slot = isPdf ? "plan" : this.state.imageSlot || "before";
                 const result = await rpc(`/bizflow/proposals/${this.state.proposal.id}/assets`, {
                     datas,
                     filename: file.name,
-                    mime: file.type || "image/png",
+                    mime: file.type || (isPdf ? "application/pdf" : "image/png"),
                     label: this.state.imageLabel || file.name,
-                    slot: this.state.imageSlot || "before",
+                    slot,
                 });
                 if (result.error) {
                     this.state.aiMessage = result.message || result.error;
@@ -1011,7 +1664,12 @@ export class ProposalEditorAction extends Component {
             this.state.lastGenerationStatus = nextStatus;
             // Reload once when generation finishes — not on every poll while status stays "done".
             if (nextStatus === "done" && prevStatus === "running") {
-                await this.openProposal(proposal.id);
+                // 2A: open Materials with persisted last_review (no auto-apply).
+                await this.openProposal(proposal.id, { preferMaterialsReview: true });
+                if (!this.state.pricingReview) {
+                    this.state.tab = "materials";
+                    await this.onAnalyzePricing();
+                }
             } else if (nextStatus === "error" && prevStatus === "running") {
                 this.state.aiMessage = state.generation?.error || "Generation failed";
             }

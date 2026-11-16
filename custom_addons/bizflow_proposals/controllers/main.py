@@ -104,6 +104,7 @@ class BizflowProposalController(http.Controller):
             "work_brief",
             "language",
             "kind",
+            "materials_report_mode",
             "access_required",
             "hidden_sections",
             "section_order",
@@ -510,32 +511,44 @@ class BizflowProposalController(http.Controller):
             return {"error": "not_found"}
         datas = payload.get("datas") or payload.get("file")
         if not datas:
-            return {"error": "no_file", "message": request.env._("Choose an image to upload.")}
+            return {
+                "error": "no_file",
+                "message": request.env._("Choose an image or PDF plan to upload."),
+            }
         # Strip data-uri prefix if present
         if isinstance(datas, str) and "," in datas and datas.strip().startswith("data:"):
             header, datas = datas.split(",", 1)
             mime = header.split(";")[0].replace("data:", "") or "image/png"
         else:
             mime = payload.get("mime") or "image/png"
+        filename = payload.get("filename") or (
+            "plan.pdf" if "pdf" in (mime or "").lower() else "upload.png"
+        )
+        slot = (payload.get("slot") or "").strip()
+        if not slot and (
+            "pdf" in (mime or "").lower() or str(filename).lower().endswith(".pdf")
+        ):
+            slot = "plan"
         asset = request.env["bizflow.proposal.asset"].create(
             {
                 "proposal_id": proposal.id,
                 "kind": "upload",
                 "label": (payload.get("label") or "")[:200],
-                "slot": payload.get("slot") or "",
+                "slot": slot,
                 "mime": mime,
                 "datas": datas,
-                "filename": payload.get("filename") or "upload.png",
+                "filename": filename,
             }
         )
-        # Place into known binary fields when slot matches
-        slot = asset.slot
-        if slot == "cover":
-            proposal.cover_image = datas
-        elif slot == "before":
-            proposal.before_image = datas
-        elif slot == "after":
-            proposal.after_image = datas
+        # Place into known binary fields when slot matches (images only)
+        is_pdf = "pdf" in (mime or "").lower() or str(filename).lower().endswith(".pdf")
+        if not is_pdf:
+            if slot == "cover":
+                proposal.cover_image = datas
+            elif slot == "before":
+                proposal.before_image = datas
+            elif slot == "after":
+                proposal.after_image = datas
         proposal.log_change("image", summary=f"Uploaded {asset.label or asset.filename}", restorable=False)
         return {"asset": asset.to_dict(), "proposal": proposal.to_editor_payload()}
 

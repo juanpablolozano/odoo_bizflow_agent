@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "BizFlow Proposals",
-    "version": "1.3.0",
+    "version": "1.4.0",
     "category": "Sales/CRM",
     "summary": "Construction proposals with AI generate/chat, materials, utility, and CRM",
     "description": """

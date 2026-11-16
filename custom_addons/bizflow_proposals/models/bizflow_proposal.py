@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import hashlib
 import json
+import logging
 import secrets
 import threading
 
@@ -13,6 +14,8 @@ from odoo.exceptions import UserError
 from odoo.modules.registry import Registry
 
 from .schema import SECTION_LABELS, SECTION_ORDER, empty_content, normalize_content
+
+_logger = logging.getLogger(__name__)
 
 
 class BizflowProposal(models.Model):
@@ -98,6 +101,17 @@ class BizflowProposal(models.Model):
     signing_ids = fields.One2many("bizflow.signing.request", "proposal_id", string="Signing")
     cost_ids = fields.One2many("bizflow.proposal.cost", "proposal_id", string="Internal costs")
     archived = fields.Boolean(default=False, index=True)
+    materials_report_mode = fields.Selection(
+        [
+            ("detailed_prices", "Items with prices"),
+            ("detailed_no_prices", "Items without prices"),
+            ("total_only", "Materials total only"),
+        ],
+        default="detailed_prices",
+        required=True,
+        string="Client materials display",
+        help="How materials appear on the client proposal / PDF.",
+    )
     pdf_template_id = fields.Many2one(
         "bizflow.pdf.template",
         string="PDF template",
@@ -497,6 +511,17 @@ class BizflowProposal(models.Model):
                             after=proposal.get_section(key),
                             summary=f"AI wrote {key}",
                         )
+                    # 2A: after generate with site photos/plan, build Materials pricing review
+                    # (preview only — never auto-apply lines).
+                    try:
+                        from odoo.addons.bizflow_proposals.models.services import pricing as pricing_svc
+
+                        on_progress(92, "materials")
+                        pricing_svc.run_pricing_preview_after_generate(proposal)
+                    except Exception:
+                        _logger.exception(
+                            "post-generate pricing preview failed for proposal %s", proposal.id
+                        )
                     reply = (
                         "Listo: escribí todas las secciones a partir de tu descripción."
                         if (proposal.language or "es") == "es"
@@ -509,6 +534,13 @@ class BizflowProposal(models.Model):
                             if (proposal.language or "es") == "es"
                             else "I drafted every section from your description "
                             "(no AI key). Refine it in chat."
+                        )
+                    content_pricing = (proposal.content or {}).get("pricing") or {}
+                    if content_pricing.get("last_review"):
+                        reply = (
+                            f"{reply} Revisa materiales y mano de obra en la pestaña Materiales."
+                            if (proposal.language or "es") == "es"
+                            else f"{reply} Review materials and labor in the Materials tab."
                         )
                     env["bizflow.proposal.message"].create(
                         {
@@ -734,6 +766,7 @@ class BizflowProposal(models.Model):
 
         sheet = [
             "<div class='sheet'>",
+            "<div data-section='cover'>",
             "<header class='doc-header'>",
             f"<div class='brand'>{logo_html}<div class='brand-text'><div class='co-name'>{company_name}</div>",
             f"<div class='co-tag'>{escape(t['tagline'])}</div></div></div>",
@@ -741,29 +774,46 @@ class BizflowProposal(models.Model):
             "</header>",
             f"<h1 class='doc-title'>{escape(title)}</h1>",
             f"<p class='prepared'>{escape(t['prepared_for'])} <strong>{escape(prepared)}</strong></p>",
-            f"<p class='intro'>{escape(intro)}</p>",
+            "</div>",
+            f"<div data-section='description'><p class='intro'>{escape(intro)}</p></div>",
         ]
         if show_ba and ba_blocks:
-            sheet.append(ba_blocks)
+            sheet.append(f"<div data-section='before_after'>{ba_blocks}</div>")
+        sheet.append("<div data-section='scope'>")
         sheet.append(f"<h2 class='section-title'>{escape(t['the_work'])}</h2>")
         sheet.append(f"<p class='work-caption'>{escape(work_caption)}</p>")
         if scope_modules:
             sheet.append(f"<ul class='scope-list'>{scope_modules}</ul>")
+        sheet.append("</div>")
+        sheet.append("<div data-section='materials'>")
         sheet.append(f"<p class='muted'>{escape(price_note)}</p>")
         sheet.append(self._render_materials_labor_table(t, materials_amt, labor_amt, total_amt))
+        sheet.append("</div>")
+        sheet.append("<div data-section='pricing'>")
         if payment_cards:
             sheet.append(f"<div class='pay-grid'>{''.join(payment_cards)}</div>")
+        sheet.append("</div>")
+        if show_utility:
+            sheet.append(
+                "<div data-section='utility'>"
+                + self._render_utility_section(content).replace("page", "utility-block")
+                + "</div>"
+            )
+        sheet.append("<div data-section='legal'>")
         if exclusions:
             sheet.append(f"<p class='exclusions'>{escape(exclusions)}</p>")
-        if show_utility:
-            sheet.append(self._render_utility_section(content).replace("page", "utility-block"))
         sheet.append(self._render_terms_and_signatures(content, t, company, accent))
+        sheet.append("</div>")
         sheet.append("</div>")
 
         css = f"""
 body{{margin:0;padding:28px;background:#e8edf2;color:#111;font-family:{font};}}
 .sheet{{max-width:780px;margin:0 auto;background:#fff;padding:36px 40px 28px;
 box-shadow:0 8px 28px rgba(0,0,0,.12);border:1px solid #ddd;}}
+[data-section]{{cursor:pointer;transition:outline-color .15s;outline:2px solid transparent;outline-offset:2px;}}
+[data-section]:hover{{outline-color:rgba(61,126,191,.35);}}
+[data-section].bf-active{{outline-color:#3D7EBF;}}
+@media print{{[data-section]{{outline:0!important;cursor:default;}}}}
 .doc-header{{margin-bottom:18px;}}
 .brand{{display:flex;align-items:center;gap:14px;}}
 .brand img{{width:56px;height:56px;object-fit:contain;border-radius:6px;}}
@@ -895,57 +945,13 @@ display:flex;align-items:flex-end;}}
             }
 
     def _render_materials_labor_table(self, t, materials_amt, labor_amt, total_amt):
-        """Detailed materials + labor lines for Lisa document."""
+        """Materials + labor for client document. Never show notes/source/manual."""
         self.ensure_one()
-        rows = [
-            "<table class='line-table'><thead><tr>"
-            f"<th>{escape(t['materials'])}</th>"
-            f"<th class='num'>{escape(t['qty'])}</th>"
-            f"<th class='num'>{escape(t['unit'])}</th>"
-            f"<th class='num'>{escape(t['line_total'])}</th>"
-            "</tr></thead><tbody>"
-        ]
+        mode = self.materials_report_mode or "detailed_prices"
         materials = self.line_ids.filtered(lambda l: l.line_type == "material")
         labor_lines = self.line_ids.filtered(lambda l: l.line_type == "labor")
-        if materials:
-            for line in materials:
-                origin = line.notes or line.supplier_id.name or (line.source or "")
-                rows.append(
-                    "<tr>"
-                    f"<td>{escape(line.name or '')}"
-                    f"<div class='line-origin'>{escape(origin)}</div></td>"
-                    f"<td class='num'>{line.quantity:g} {escape(line.uom_name or '')}</td>"
-                    f"<td class='num'>${line.price_unit:,.2f}</td>"
-                    f"<td class='num'>${line.price_subtotal:,.2f}</td>"
-                    "</tr>"
-                )
-        else:
-            rows.append(
-                f"<tr><td colspan='3'>{escape(t['materials'])}</td>"
-                f"<td class='num'>${materials_amt:,.2f}</td></tr>"
-            )
-        rows.append(
-            f"<tr class='section-row'><td colspan='3'>{escape(t['labor'])}</td>"
-            f"<td class='num'>${labor_amt:,.2f}</td></tr>"
-        )
-        for line in labor_lines:
-            origin = line.notes or ""
-            rows.append(
-                "<tr>"
-                f"<td>{escape(line.name or '')}"
-                f"<div class='line-origin'>{escape(origin)}</div></td>"
-                f"<td class='num'>{line.quantity:g} {escape(line.uom_name or '')}</td>"
-                f"<td class='num'>${line.price_unit:,.2f}</td>"
-                f"<td class='num'>${line.price_subtotal:,.2f}</td>"
-                "</tr>"
-            )
-        rows.append("</tbody></table>")
-        rows.append(
-            f"<div class='total-bar'><span>{escape(t['total'])}</span>"
-            f"<span class='total-amt'>${total_amt:,.2f}</span></div>"
-        )
-        # Keep summary rows for empty proposals without labor detail
-        if not materials and not labor_lines:
+
+        if mode == "total_only" or (not materials and not labor_lines):
             return (
                 "<table class='price-table'><tbody>"
                 f"<tr><td>{escape(t['materials'])}</td><td class='num'>${materials_amt:,.2f}</td></tr>"
@@ -954,6 +960,76 @@ display:flex;align-items:flex-end;}}
                 f"<div class='total-bar'><span>{escape(t['total'])}</span>"
                 f"<span class='total-amt'>${total_amt:,.2f}</span></div>"
             )
+
+        show_prices = mode == "detailed_prices"
+        if show_prices:
+            rows = [
+                "<table class='line-table'><thead><tr>"
+                f"<th>{escape(t['materials'])}</th>"
+                f"<th class='num'>{escape(t['qty'])}</th>"
+                f"<th class='num'>{escape(t['unit'])}</th>"
+                f"<th class='num'>{escape(t['line_total'])}</th>"
+                "</tr></thead><tbody>"
+            ]
+        else:
+            # 1B: name + quantity only (no $)
+            rows = [
+                "<table class='line-table'><thead><tr>"
+                f"<th>{escape(t['materials'])}</th>"
+                "</tr></thead><tbody>"
+            ]
+
+        if materials:
+            for line in materials:
+                qty_label = f"{line.quantity:g} {line.uom_name or ''}".strip()
+                name = escape(line.name or "")
+                if show_prices:
+                    rows.append(
+                        "<tr>"
+                        f"<td>{name}</td>"
+                        f"<td class='num'>{escape(qty_label)}</td>"
+                        f"<td class='num'>${line.price_unit:,.2f}</td>"
+                        f"<td class='num'>${line.price_subtotal:,.2f}</td>"
+                        "</tr>"
+                    )
+                else:
+                    rows.append(
+                        f"<tr><td>{name} — {escape(qty_label)}</td></tr>"
+                    )
+        elif show_prices:
+            rows.append(
+                f"<tr><td colspan='3'>{escape(t['materials'])}</td>"
+                f"<td class='num'>${materials_amt:,.2f}</td></tr>"
+            )
+
+        if show_prices:
+            rows.append(
+                f"<tr class='section-row'><td colspan='3'>{escape(t['labor'])}</td>"
+                f"<td class='num'>${labor_amt:,.2f}</td></tr>"
+            )
+            for line in labor_lines:
+                qty_label = f"{line.quantity:g} {line.uom_name or ''}".strip()
+                rows.append(
+                    "<tr>"
+                    f"<td>{escape(line.name or '')}</td>"
+                    f"<td class='num'>{escape(qty_label)}</td>"
+                    f"<td class='num'>${line.price_unit:,.2f}</td>"
+                    f"<td class='num'>${line.price_subtotal:,.2f}</td>"
+                    "</tr>"
+                )
+        else:
+            rows.append(f"<tr class='section-row'><td>{escape(t['labor'])}</td></tr>")
+            for line in labor_lines:
+                qty_label = f"{line.quantity:g} {line.uom_name or ''}".strip()
+                rows.append(
+                    f"<tr><td>{escape(line.name or '')} — {escape(qty_label)}</td></tr>"
+                )
+
+        rows.append("</tbody></table>")
+        rows.append(
+            f"<div class='total-bar'><span>{escape(t['total'])}</span>"
+            f"<span class='total-amt'>${total_amt:,.2f}</span></div>"
+        )
         return "".join(rows)
 
     def _render_terms_and_signatures(self, content, t, company, accent):
@@ -1189,6 +1265,7 @@ display:flex;align-items:flex-end;}}
             "code": self.code,
             "state": self.state,
             "kind": self.kind or "proposal",
+            "materials_report_mode": self.materials_report_mode or "detailed_prices",
             "language": self.language or "es",
             "partner_id": self.partner_id.id,
             "partner_name": self.partner_id.display_name,

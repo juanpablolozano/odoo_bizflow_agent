@@ -76,6 +76,7 @@ DEFAULT_CONTENT = {
         "notes": "",
         "materials_prompt": "",
         "payments": [],
+        "last_review": False,
     },
     "utility": {
         "intro": "",
@@ -123,5 +124,6 @@ def normalize_content(raw):
     return data
 
 
-def empty_content():
+def empty_content(*_args, **_kwargs):
+    """Odoo field defaults receive the recordset; ignore args."""
     return normalize_content({})

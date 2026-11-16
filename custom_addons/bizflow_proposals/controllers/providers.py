@@ -28,12 +28,27 @@ class BizflowProviderController(http.Controller):
         query = payload.get("query") or ""
         supplier_ids = payload.get("supplier_ids") or []
         limit = int(payload.get("limit") or 20)
+        location = payload.get("location") or ""
         results = request.env["bizflow.supplier"].search_all_providers(
             query,
             supplier_ids=supplier_ids or None,
             limit=limit,
+            location=location or None,
         )
-        return {"items": results}
+        # Group by supplier for picker UI (same query → choose HD vs Lowe's).
+        by_supplier = {}
+        for hit in results:
+            sid = hit.get("supplier_id") or 0
+            by_supplier.setdefault(
+                sid,
+                {
+                    "supplier_id": sid,
+                    "supplier_name": hit.get("supplier_name") or "",
+                    "items": [],
+                },
+            )
+            by_supplier[sid]["items"].append(hit)
+        return {"items": results, "groups": list(by_supplier.values()), "query": query}
 
     @http.route("/bizflow/materials/import", type="jsonrpc", auth="user", methods=["POST"])
     def import_material(self, **payload):

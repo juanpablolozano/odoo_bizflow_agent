@@ -213,7 +213,7 @@ class BizflowAiController(http.Controller):
         methods=["POST"],
     )
     def analyze_pricing(self, proposal_id, **payload):
-        """BOM via active suppliers + labor by location (AI price_assist)."""
+        """BOM via suppliers. Default: preview candidates (2C). apply=true writes lines."""
         proposal = request.env["bizflow.proposal"].browse(int(proposal_id)).exists()
         if not proposal:
             return {"error": "not_found"}
@@ -223,6 +223,11 @@ class BizflowAiController(http.Controller):
             return pricing_svc.analyze_and_apply_pricing(
                 proposal,
                 materials_prompt=payload.get("materials_prompt"),
+                apply=bool(payload.get("apply")),
+                candidates=payload.get("candidates"),
+                labor=payload.get("labor"),
+                labor_items=payload.get("labor_items"),
+                exclusions=payload.get("exclusions"),
             )
         except Exception as exc:
             _logger.exception("Pricing analysis failed")

@@ -85,6 +85,36 @@
                             <input t-att-value="this.state.location"
                                    t-on-input="(ev) => this.onFieldInput('location', ev)"/>
                         </div>
+                        <div class="o_bizflow_field">
+                            <label t-esc="this.copy.sitePhotos"/>
+                            <p class="muted" t-esc="this.copy.sitePhotosHint"/>
+                            <input type="file" accept="image/*" multiple="multiple"
+                                   t-on-change="(ev) => this.onPendingPhotos(ev)"/>
+                            <div class="o_bizflow_pending_files" t-if="this.state.pendingPhotos.length">
+                                <t t-foreach="this.state.pendingPhotos" t-as="file" t-key="file_index">
+                                    <div class="o_bizflow_pending_row">
+                                        <span t-esc="file.name"/>
+                                        <button type="button" class="secondary"
+                                                t-on-click="() => this.removePendingPhoto(file_index)">×</button>
+                                    </div>
+                                </t>
+                            </div>
+                        </div>
+                        <div class="o_bizflow_field">
+                            <label t-esc="this.copy.planPdf"/>
+                            <p class="muted" t-esc="this.copy.planPdfHint"/>
+                            <input type="file" accept="application/pdf,.pdf"
+                                   t-on-change="(ev) => this.onPendingPlans(ev)"/>
+                            <div class="o_bizflow_pending_files" t-if="this.state.pendingPlans.length">
+                                <t t-foreach="this.state.pendingPlans" t-as="file" t-key="file_index">
+                                    <div class="o_bizflow_pending_row">
+                                        <span t-esc="file.name"/>
+                                        <button type="button" class="secondary"
+                                                t-on-click="() => this.removePendingPlan(file_index)">×</button>
+                                    </div>
+                                </t>
+                            </div>
+                        </div>
                         <div class="o_bizflow_actions">
                             <button class="secondary" t-on-click="() => this.onCreateProposal(false)"
                                     t-att-disabled="this.state.creating"
@@ -146,21 +176,29 @@
                         </div>
 
                         <t t-if="this.state.tab === 'sections'">
-                            <div class="o_bizflow_section_list">
-                                <t t-foreach="this.sectionEntries" t-as="entry" t-key="entry.key">
-                                    <button t-att-class="{'active': this.state.sectionKey === entry.key}"
-                                            t-on-click="() => this.selectSection(entry.key)">
-                                        <span t-esc="entry.label"/>
-                                        <span t-if="entry.hidden" class="muted">hidden</span>
-                                    </button>
-                                </t>
+                            <t t-if="!this.state.activeSection">
+                                <div class="o_bizflow_section_list">
+                                    <t t-foreach="this.sectionEntries" t-as="entry" t-key="entry.key">
+                                        <button t-on-click="() => this.openSection(entry.key)">
+                                            <span t-esc="entry.label"/>
+                                            <span t-if="entry.hidden" class="muted">hidden</span>
+                                        </button>
+                                    </t>
+                                </div>
+                            </t>
+                            <t t-else="">
+                            <div class="o_bizflow_section_detail_head">
+                                <button type="button" class="secondary o_bizflow_section_back"
+                                        t-on-click="this.backToSectionList"
+                                        t-att-title="this.copy.allSections"
+                                        t-att-aria-label="this.copy.allSections">←</button>
+                                <strong t-esc="this.activeSectionLabel"/>
                             </div>
                             <div class="o_bizflow_tabs o_bizflow_subtabs">
                                 <button t-att-class="{'active': this.state.sectionMode === 'chat'}" t-on-click="() => this.setSectionMode('chat')" t-esc="this.copy.chat"/>
                                 <button t-att-class="{'active': this.state.sectionMode === 'edit'}" t-on-click="() => this.setSectionMode('edit')" t-esc="this.copy.edit"/>
                                 <button t-att-class="{'active': this.state.sectionMode === 'images'}" t-on-click="() => this.setSectionMode('images')" t-esc="this.copy.images"/>
                             </div>
-                            <p class="muted" t-esc="this.copy.noTech"/>
 
                             <t t-if="this.state.sectionMode === 'chat'">
                                 <div class="o_bizflow_chat">
@@ -229,8 +267,9 @@
                                 </div>
                                 <div class="o_bizflow_field">
                                     <label t-esc="this.copy.upload"/>
-                                    <input type="file" accept="image/*" t-on-change="(ev) => this.onPickImage(ev)"/>
+                                    <input type="file" accept="image/*,application/pdf,.pdf" t-on-change="(ev) => this.onPickImage(ev)"/>
                                 </div>
+                            </t>
                             </t>
                         </t>
 
@@ -265,12 +304,13 @@
                                     <option value="cover">Cover</option>
                                     <option value="before">Before</option>
                                     <option value="after">After</option>
+                                    <option value="plan">Plan / PDF</option>
                                 </select>
                             </div>
                             <div class="o_bizflow_field">
                                 <label t-esc="this.copy.upload"/>
                                 <input type="file"
-                                       accept="image/*"
+                                       accept="image/*,application/pdf,.pdf"
                                        multiple="multiple"
                                        t-att-disabled="this.state.imageBusy"
                                        t-on-change="(ev) => this.onPickImage(ev)"/>
@@ -361,6 +401,20 @@
 
                         <t t-if="this.state.tab === 'materials'">
                             <div class="o_bizflow_field">
+                                <label t-esc="this.copy.reportModeLabel"/>
+                                <select t-on-change="(ev) => this.onReportModeChange(ev)">
+                                    <option value="detailed_prices"
+                                            t-att-selected="this.state.materialsReportMode === 'detailed_prices'"
+                                            t-esc="this.copy.reportModePrices"/>
+                                    <option value="detailed_no_prices"
+                                            t-att-selected="this.state.materialsReportMode === 'detailed_no_prices'"
+                                            t-esc="this.copy.reportModeNoPrices"/>
+                                    <option value="total_only"
+                                            t-att-selected="this.state.materialsReportMode === 'total_only'"
+                                            t-esc="this.copy.reportModeTotal"/>
+                                </select>
+                            </div>
+                            <div class="o_bizflow_field">
                                 <label t-esc="this.copy.materialsPrompt"/>
                                 <textarea rows="5"
                                           t-att-value="this.state.materialsPrompt"
@@ -375,23 +429,159 @@
                             <p class="muted" t-if="this.state.pricingBusy" t-esc="this.copy.analyzingPricing"/>
                             <p class="muted" t-if="this.state.aiMessage" t-esc="this.state.aiMessage"/>
 
-                            <h3 t-esc="this.copy.linesTitle"/>
-                            <div class="o_bizflow_lines_table">
-                                <div class="o_bizflow_lines_head">
-                                    <span t-esc="this.copy.colDesc"/>
-                                    <span t-esc="this.copy.colQty"/>
-                                    <span t-esc="this.copy.colUnit"/>
-                                    <span t-esc="this.copy.colTotal"/>
-                                    <span t-esc="this.copy.colOrigin"/>
-                                    <span></span>
+                            <t t-if="this.state.pricingReview">
+                                <h3 t-esc="this.copy.reviewPricing"/>
+                                <p class="muted" t-if="this.pricingReviewTotals">
+                                    <t t-esc="this.copy.previewTotals"/>:
+                                    <t t-esc="this.formatMoney(this.pricingReviewTotals.materials)"/> +
+                                    <t t-esc="this.formatMoney(this.pricingReviewTotals.labor)"/> =
+                                    <strong t-esc="this.formatMoney(this.pricingReviewTotals.grand)"/>
+                                </p>
+                                <div class="o_bizflow_pricing_review">
+                                    <t t-foreach="this.state.pricingReview.candidates" t-as="cand" t-key="cand.id">
+                                        <div class="o_bizflow_candidate">
+                                            <div class="o_bizflow_candidate_head">
+                                                <div>
+                                                    <strong t-esc="cand.name"/>
+                                                    <span class="o_bizflow_qty_badge">
+                                                        <t t-esc="this.formatQty(cand.quantity)"/>
+                                                        <t t-esc="cand.uom"/>
+                                                    </span>
+                                                    <span t-if="cand.category" class="muted"> · <t t-esc="cand.category"/></span>
+                                                </div>
+                                                <div class="o_bizflow_candidate_actions">
+                                                    <button type="button"
+                                                            t-att-disabled="this.state.pricingBusy || !(cand.options &amp;&amp; cand.options.length)"
+                                                            t-on-click="() => this.addPricingCandidate(cand)"
+                                                            t-esc="this.copy.addCandidate"/>
+                                                    <button type="button" class="secondary"
+                                                            t-on-click="() => this.dismissPricingCandidate(cand.id)"
+                                                            t-esc="this.copy.skipCandidate"/>
+                                                </div>
+                                            </div>
+                                            <div class="o_bizflow_candidate_options">
+                                                <p t-if="!cand.options || !cand.options.length" class="muted"
+                                                   t-esc="this.copy.noVerifiedPrice"/>
+                                                <t t-foreach="cand.options" t-as="opt" t-key="opt.key">
+                                                    <label class="o_bizflow_option"
+                                                           t-att-class="{
+                                                               'selected': cand.selected_key === opt.key,
+                                                               'recommended': opt.recommended
+                                                           }">
+                                                        <input type="radio"
+                                                               t-att-name="'cand-' + cand.id"
+                                                               t-att-checked="cand.selected_key === opt.key"
+                                                               t-on-change="() => this.onSelectCandidateOption(cand.id, opt.key)"/>
+                                                        <span class="o_bizflow_option_body">
+                                                            <span t-if="opt.recommended" class="o_bizflow_rec_pill"
+                                                                  t-esc="this.copy.recommended"/>
+                                                            <span t-if="opt.estimated" class="o_bizflow_rec_pill"
+                                                                  t-esc="this.copy.referentialPrice"/>
+                                                            <t t-esc="opt.supplier_name || '—'"/>
+                                                            — <t t-esc="this.formatMoney(opt.price)"/>
+                                                            <span class="muted" t-if="opt.name and opt.name != cand.name">
+                                                                · <t t-esc="opt.name"/>
+                                                            </span>
+                                                        </span>
+                                                        <a t-if="opt.url" t-att-href="opt.url" target="_blank"
+                                                           rel="noopener noreferrer" class="muted"
+                                                           t-on-click.stop="this.onProductLinkClick"
+                                                           t-esc="this.copy.openUrl"/>
+                                                    </label>
+                                                </t>
+                                            </div>
+                                        </div>
+                                    </t>
+                                    <t t-if="this.state.pricingReview.labor_items and this.state.pricingReview.labor_items.length">
+                                        <h4 t-esc="this.copy.laborTrades"/>
+                                        <t t-foreach="this.state.pricingReview.labor_items" t-as="li" t-key="li.id">
+                                            <div class="o_bizflow_candidate o_bizflow_labor_card">
+                                                <div class="o_bizflow_candidate_head">
+                                                    <div>
+                                                        <label class="o_bizflow_labor_toggle">
+                                                            <input type="checkbox"
+                                                                   t-att-checked="li.included !== false"
+                                                                   t-on-change="() => this.onToggleLaborItemIncluded(li.id)"/>
+                                                            <strong t-esc="li.name || this.copy.laborTitle"/>
+                                                            <span t-if="li.trade" class="muted"> · <t t-esc="li.trade"/></span>
+                                                        </label>
+                                                        <span class="o_bizflow_qty_badge">
+                                                            <t t-esc="this.formatQty(li.hours)"/>
+                                                            <t t-esc="this.copy.laborHours"/>
+                                                            · <t t-esc="this.formatMoney(li.hourly_rate)"/>/h
+                                                            · <t t-esc="this.formatMoney(li.total)"/>
+                                                        </span>
+                                                    </div>
+                                                    <div class="o_bizflow_candidate_actions">
+                                                        <button type="button"
+                                                                t-att-disabled="this.state.pricingBusy || li.included === false"
+                                                                t-on-click="() => this.addPricingLabor(li)"
+                                                                t-esc="this.copy.addCandidate"/>
+                                                        <button type="button" class="secondary"
+                                                                t-on-click="() => this.dismissPricingLabor(li.id)"
+                                                                t-esc="this.copy.skipCandidate"/>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </t>
+                                    </t>
+                                    <t t-elif="this.state.pricingReview.labor">
+                                        <div class="o_bizflow_candidate o_bizflow_labor_card">
+                                            <div class="o_bizflow_candidate_head">
+                                                <div>
+                                                    <label class="o_bizflow_labor_toggle">
+                                                        <input type="checkbox"
+                                                               t-att-checked="this.state.pricingReview.labor.included !== false"
+                                                               t-on-change="() => this.onToggleLaborIncluded()"/>
+                                                        <strong t-esc="this.state.pricingReview.labor.name || this.copy.laborTitle"/>
+                                                    </label>
+                                                    <span class="o_bizflow_qty_badge">
+                                                        <t t-esc="this.formatQty(this.state.pricingReview.labor.hours)"/>
+                                                        <t t-esc="this.copy.laborHours"/>
+                                                        · <t t-esc="this.formatMoney(this.state.pricingReview.labor.hourly_rate)"/>/h
+                                                        · <t t-esc="this.formatMoney(this.state.pricingReview.labor.total)"/>
+                                                    </span>
+                                                </div>
+                                                <div class="o_bizflow_candidate_actions">
+                                                    <button type="button"
+                                                            t-att-disabled="this.state.pricingBusy || this.state.pricingReview.labor.included === false"
+                                                            t-on-click="() => this.addPricingLabor()"
+                                                            t-esc="this.copy.addCandidate"/>
+                                                    <button type="button" class="secondary"
+                                                            t-on-click="() => this.dismissPricingLabor()"
+                                                            t-esc="this.copy.skipCandidate"/>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </t>
+                                    <div class="o_bizflow_actions">
+                                        <button t-on-click="this.onApplyPricingReview"
+                                                t-att-disabled="this.state.pricingBusy"
+                                                t-esc="this.copy.applyPricing"/>
+                                        <button class="secondary" t-on-click="this.cancelPricingReview"
+                                                t-esc="this.copy.cancelReview"/>
+                                    </div>
                                 </div>
-                                <t t-foreach="this.state.proposal.lines" t-as="line" t-key="line.id">
-                                    <div class="o_bizflow_lines_row">
-                                        <input t-att-value="this.lineFieldValue(line, 'name')"
-                                               t-on-focus="(ev) => this.onLineFocus(line, 'name', ev)"
-                                               t-on-input="this.onLineInput"
-                                               t-on-change="(ev) => this.onUpdateLine(line, 'name', ev)"/>
-                                        <span class="o_bizflow_qty_uom">
+                            </t>
+
+                            <h3 t-esc="this.copy.linesTitle"/>
+                            <div class="o_bizflow_lines_scroll">
+                                <div class="o_bizflow_lines_table">
+                                    <div class="o_bizflow_lines_head">
+                                        <span t-esc="this.copy.colDesc"/>
+                                        <span t-esc="this.copy.colQty"/>
+                                        <span t-esc="this.copy.colUom"/>
+                                        <span t-esc="this.copy.colUnit"/>
+                                        <span t-esc="this.copy.colTotal"/>
+                                        <span t-esc="this.copy.colSupplier"/>
+                                        <span></span>
+                                    </div>
+                                    <t t-foreach="this.state.proposal.lines" t-as="line" t-key="line.id">
+                                        <div class="o_bizflow_lines_row">
+                                            <input t-att-value="this.lineFieldValue(line, 'name')"
+                                                   t-on-focus="(ev) => this.onLineFocus(line, 'name', ev)"
+                                                   t-on-input="this.onLineInput"
+                                                   t-on-change="(ev) => this.onUpdateLine(line, 'name', ev)"/>
                                             <input type="number" step="0.01" min="0"
                                                    t-att-value="this.lineFieldValue(line, 'quantity')"
                                                    t-on-focus="(ev) => this.onLineFocus(line, 'quantity', ev)"
@@ -402,21 +592,25 @@
                                                    t-on-focus="(ev) => this.onLineFocus(line, 'uom_name', ev)"
                                                    t-on-input="this.onLineInput"
                                                    t-on-change="(ev) => this.onUpdateLine(line, 'uom_name', ev)"/>
-                                        </span>
-                                        <input type="number" step="0.01" min="0"
-                                               class="o_bizflow_price_edit"
-                                               t-att-value="this.lineFieldValue(line, 'price_unit')"
-                                               t-att-title="this.copy.editPriceHint"
-                                               t-on-focus="(ev) => this.onLineFocus(line, 'price_unit', ev)"
-                                               t-on-input="this.onLineInput"
-                                               t-on-change="(ev) => this.onUpdateLine(line, 'price_unit', ev)"/>
-                                        <span class="num" t-esc="this.formatMoney(line.price_subtotal)"/>
-                                        <span class="origin" t-esc="line.notes || line.source || ''"/>
-                                        <button type="button" class="secondary"
-                                                t-on-click="() => this.removeLine(line.id)"
-                                                t-esc="this.copy.deleteImage"/>
-                                    </div>
-                                </t>
+                                            <input type="number" step="0.01" min="0"
+                                                   class="o_bizflow_price_edit"
+                                                   t-att-value="this.lineFieldValue(line, 'price_unit')"
+                                                   t-att-title="this.copy.editPriceHint"
+                                                   t-on-focus="(ev) => this.onLineFocus(line, 'price_unit', ev)"
+                                                   t-on-input="this.onLineInput"
+                                                   t-on-change="(ev) => this.onUpdateLine(line, 'price_unit', ev)"/>
+                                            <span class="num" t-esc="this.formatMoney(line.price_subtotal)"/>
+                                            <span class="supplier">
+                                                <t t-esc="line.supplier_name || '—'"/>
+                                                <a t-if="line.product_url" t-att-href="line.product_url"
+                                                   target="_blank" rel="noopener noreferrer" class="muted"> ↗</a>
+                                            </span>
+                                            <button type="button" class="secondary"
+                                                    t-on-click="() => this.removeLine(line.id)"
+                                                    t-esc="this.copy.deleteImage"/>
+                                        </div>
+                                    </t>
+                                </div>
                             </div>
 
                             <h3 t-esc="this.copy.addManual"/>
@@ -442,20 +636,30 @@
                                 <label t-esc="this.copy.searchSuppliers"/>
                                 <input t-att-value="this.state.materialQuery"
                                        t-on-input="(ev) => this.onFieldInput('materialQuery', ev)"
-                                       placeholder="e.g. 2x4 stud, paint, tile"/>
+                                       placeholder="e.g. stucco, 2x4 stud, paint"/>
                             </div>
                             <div class="o_bizflow_actions">
                                 <button class="secondary" t-on-click="this.onSearchMaterials"
+                                        t-att-disabled="this.state.searchBusy"
                                         t-esc="this.copy.search"/>
                             </div>
-                            <ul class="o_bizflow_list">
+                            <ul class="o_bizflow_list o_bizflow_search_hits">
                                 <t t-foreach="this.state.searchResults" t-as="hit" t-key="hit_index">
-                                    <li>
-                                        <span>
-                                            <strong t-esc="hit.name"/>
-                                            <br/>
-                                            <span t-esc="hit.supplier_name"/> — $<t t-esc="hit.price"/>
-                                        </span>
+                                    <li t-att-class="{'selected': this.state.selectedSearchKey === this.searchHitKey(hit, hit_index)}">
+                                        <label class="o_bizflow_hit">
+                                            <input type="radio"
+                                                   name="search-hit"
+                                                   t-att-checked="this.state.selectedSearchKey === this.searchHitKey(hit, hit_index)"
+                                                   t-on-change="() => this.selectSearchHit(this.searchHitKey(hit, hit_index))"/>
+                                            <span>
+                                                <strong t-esc="hit.name"/>
+                                                <br/>
+                                                <span t-esc="hit.supplier_name"/> — <t t-esc="this.formatMoney(hit.price)"/>
+                                                <a t-if="hit.url" t-att-href="hit.url" target="_blank"
+                                                   rel="noopener noreferrer" class="muted"
+                                                   t-on-click.stop="this.onProductLinkClick"> · <t t-esc="this.copy.openUrl"/></a>
+                                            </span>
+                                        </label>
                                         <button t-on-click="() => this.addMaterialHit(hit)"
                                                 t-esc="this.copy.addLine"/>
                                     </li>
@@ -608,7 +812,7 @@
                         </t>
                     </aside>
                     <main class="o_bizflow_editor_preview">
-                        <iframe t-att-srcdoc="this.state.proposal.html"/>
+                        <iframe t-ref="this.previewRef" t-att-srcdoc="this.state.proposal.html"/>
                     </main>
                 </div>
             </t>
