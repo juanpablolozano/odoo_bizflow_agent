@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <record id="ai_model_before_after" model="bizflow.ai.model">
+        <field name="name">Before/After (OpenAI Images)</field>
+        <field name="purpose">before_after</field>
+        <field name="provider">openai</field>
+        <field name="model_name">gpt-image-2.5-flare</field>
+        <field name="default_prompt">Photorealistic after photo of a completed construction remodel. Project type: {project_type}. Scope: {scope}. Notes: {notes}. Keep camera angle similar to the before photo, realistic materials and lighting.</field>
+        <field name="sequence">10</field>
+    </record>
+    <record id="ai_model_copy" model="bizflow.ai.model">
+        <field name="name">Proposal copy (GPT)</field>
+        <field name="purpose">proposal_copy</field>
+        <field name="provider">openai</field>
+        <field name="model_name">gpt-4o-mini</field>
+        <field name="sequence">20</field>
+    </record>
+    <record id="ai_model_price" model="bizflow.ai.model">
+        <field name="name">Price assist (GPT)</field>
+        <field name="purpose">price_assist</field>
+        <field name="provider">openai</field>
+        <field name="model_name">gpt-4o-mini</field>
+        <field name="sequence">30</field>
+    </record>
+</odoo>

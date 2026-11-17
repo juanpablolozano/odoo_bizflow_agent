@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_bizflow_root"
+              name="BizFlow Proposals"
+              web_icon="bizflow_proposals,static/description/icon.png"
+              sequence="45"/>
+
+    <menuitem id="menu_bizflow_proposals"
+              name="Proposals"
+              parent="menu_bizflow_root"
+              action="action_bizflow_proposal"
+              sequence="10"/>
+
+    <menuitem id="menu_bizflow_editor"
+              name="Editor"
+              parent="menu_bizflow_root"
+              action="action_bizflow_proposal_editor"
+              sequence="15"/>
+
+    <menuitem id="menu_bizflow_catalog"
+              name="Catalog"
+              parent="menu_bizflow_root"
+              sequence="20"/>
+
+    <menuitem id="menu_bizflow_materials"
+              name="Materials"
+              parent="menu_bizflow_catalog"
+              action="action_bizflow_material"
+              sequence="10"/>
+
+    <menuitem id="menu_bizflow_suppliers"
+              name="Suppliers"
+              parent="menu_bizflow_catalog"
+              action="action_bizflow_supplier"
+              sequence="20"/>
+
+    <menuitem id="menu_bizflow_config"
+              name="Configuration"
+              parent="menu_bizflow_root"
+              sequence="90"
+              groups="bizflow_proposals.group_bizflow_manager"/>
+
+    <menuitem id="menu_bizflow_ai_models"
+              name="AI models"
+              parent="menu_bizflow_config"
+              action="action_bizflow_ai_model"
+              sequence="10"/>
+
+    <menuitem id="menu_bizflow_pdf_templates"
+              name="PDF templates"
+              parent="menu_bizflow_config"
+              action="action_bizflow_pdf_template"
+              sequence="20"/>
+
+    <menuitem id="menu_bizflow_company_profile"
+              name="Company profile"
+              parent="menu_bizflow_config"
+              action="action_bizflow_company_profile"
+              sequence="30"/>
+
+    <menuitem id="menu_crm_bizflow_proposals"
+              name="Construction proposals"
+              parent="crm.crm_menu_root"
+              action="action_bizflow_proposal"
+              sequence="25"/>
+</odoo>
