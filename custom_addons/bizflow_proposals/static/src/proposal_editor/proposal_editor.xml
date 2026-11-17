@@ -451,7 +451,7 @@
                                                 </div>
                                                 <div class="o_bizflow_candidate_actions">
                                                     <button type="button"
-                                                            t-att-disabled="this.state.pricingBusy || !(cand.options &amp;&amp; cand.options.length)"
+                                                            t-att-disabled="this.state.pricingBusy"
                                                             t-on-click="() => this.addPricingCandidate(cand)"
                                                             t-esc="this.copy.addCandidate"/>
                                                     <button type="button" class="secondary"
@@ -460,34 +460,36 @@
                                                 </div>
                                             </div>
                                             <div class="o_bizflow_candidate_options">
-                                                <p t-if="!cand.options || !cand.options.length" class="muted"
+                                                <p t-if="cand.unverified" class="muted"
                                                    t-esc="this.copy.noVerifiedPrice"/>
                                                 <t t-foreach="cand.options" t-as="opt" t-key="opt.key">
-                                                    <label class="o_bizflow_option"
-                                                           t-att-class="{
-                                                               'selected': cand.selected_key === opt.key,
-                                                               'recommended': opt.recommended
-                                                           }">
-                                                        <input type="radio"
-                                                               t-att-name="'cand-' + cand.id"
-                                                               t-att-checked="cand.selected_key === opt.key"
-                                                               t-on-change="() => this.onSelectCandidateOption(cand.id, opt.key)"/>
-                                                        <span class="o_bizflow_option_body">
-                                                            <span t-if="opt.recommended" class="o_bizflow_rec_pill"
-                                                                  t-esc="this.copy.recommended"/>
-                                                            <span t-if="opt.estimated" class="o_bizflow_rec_pill"
-                                                                  t-esc="this.copy.referentialPrice"/>
-                                                            <t t-esc="opt.supplier_name || '—'"/>
-                                                            — <t t-esc="this.formatMoney(opt.price)"/>
-                                                            <span class="muted" t-if="opt.name and opt.name != cand.name">
-                                                                · <t t-esc="opt.name"/>
+                                                    <t t-if="opt.source != 'qty'">
+                                                        <label class="o_bizflow_option"
+                                                               t-att-class="{
+                                                                   'selected': cand.selected_key === opt.key,
+                                                                   'recommended': opt.recommended
+                                                               }">
+                                                            <input type="radio"
+                                                                   t-att-name="'cand-' + cand.id"
+                                                                   t-att-checked="cand.selected_key === opt.key"
+                                                                   t-on-change="() => this.onSelectCandidateOption(cand.id, opt.key)"/>
+                                                            <span class="o_bizflow_option_body">
+                                                                <span t-if="opt.recommended" class="o_bizflow_rec_pill"
+                                                                      t-esc="this.copy.recommended"/>
+                                                                <span t-if="opt.estimated" class="o_bizflow_rec_pill"
+                                                                      t-esc="this.copy.referentialPrice"/>
+                                                                <t t-esc="opt.supplier_name || '—'"/>
+                                                                — <t t-esc="this.formatMoney(opt.price)"/>
+                                                                <span class="muted" t-if="opt.name and opt.name != cand.name">
+                                                                    · <t t-esc="opt.name"/>
+                                                                </span>
                                                             </span>
-                                                        </span>
-                                                        <a t-if="opt.url" t-att-href="opt.url" target="_blank"
-                                                           rel="noopener noreferrer" class="muted"
-                                                           t-on-click.stop="this.onProductLinkClick"
-                                                           t-esc="this.copy.openUrl"/>
-                                                    </label>
+                                                            <a t-if="opt.url" t-att-href="opt.url" target="_blank"
+                                                               rel="noopener noreferrer" class="muted"
+                                                               t-on-click.stop="this.onProductLinkClick"
+                                                               t-esc="this.copy.openUrl"/>
+                                                        </label>
+                                                    </t>
                                                 </t>
                                             </div>
                                         </div>

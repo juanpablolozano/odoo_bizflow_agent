@@ -199,7 +199,7 @@ export class ProposalEditorAction extends Component {
                 reviewPricing: "Revisar precios",
                 applyPricing: "Agregar todos",
                 cancelReview: "Cancelar",
-                noVerifiedPrice: "Sin precio en retailer — busca o edita a mano (cantidad ya estimada)",
+                noVerifiedPrice: "Sin precio en retailer — puedes agregar la cantidad al reporte y editar el precio luego",
                 referentialPrice: "Referencial",
                 recommended: "Recomendado",
                 laborTitle: "Mano de obra",
@@ -280,7 +280,7 @@ export class ProposalEditorAction extends Component {
             reviewPricing: "Review prices",
             applyPricing: "Add all",
             cancelReview: "Cancel",
-            noVerifiedPrice: "No retailer price — search or edit by hand (qty already estimated)",
+            noVerifiedPrice: "No retailer price — you can still add the qty to the report and edit price later",
             referentialPrice: "Referential",
             recommended: "Recommended",
             laborTitle: "Labor",
@@ -1124,32 +1124,40 @@ export class ProposalEditorAction extends Component {
             return;
         }
         const chosen = this._chosenOption(cand);
-        if (!chosen || !(chosen.url || "").startsWith("http") || !(chosen.price > 0)) {
-            this.state.aiMessage = this.copy.noVerifiedPrice;
+        const name = (chosen?.name || cand.name || cand.query || "").trim();
+        if (!name) {
             return;
         }
-        if (this._lineAlreadyHasUrl(chosen.url)) {
+        const url = (chosen?.url || "").trim();
+        const price = Number(chosen?.price || 0);
+        const hasVerified =
+            Boolean(chosen) && url.startsWith("http") && price > 0;
+        // Qty-only / unverified candidates are still addable so the report lists materials.
+        if (hasVerified && this._lineAlreadyHasUrl(url)) {
             this._removeCandidateFromReview(cand.id);
             return;
         }
-        const isRef = Boolean(chosen.estimated || chosen.source === "referential");
+        const isQtyOnly = !hasVerified;
+        const isRef = Boolean(
+            !isQtyOnly && (chosen?.estimated || chosen?.source === "referential")
+        );
         this.state.pricingBusy = true;
         try {
             const data = await rpc(`/bizflow/proposals/${this.state.proposal.id}/lines`, {
-                name: chosen.name || cand.name,
+                name,
                 line_type: "material",
                 quantity: Number(cand.quantity || 1),
                 uom_name: cand.uom || "unit",
-                price_unit: chosen.price || 0,
-                cost_unit: chosen.price || 0,
-                supplier_id: chosen.supplier_id || false,
-                source: isRef ? "import" : "provider",
-                product_url: chosen.url || "",
-                notes: isRef ? "referential" : "",
+                price_unit: hasVerified ? price : 0,
+                cost_unit: hasVerified ? price : 0,
+                supplier_id: hasVerified ? chosen.supplier_id || false : false,
+                source: isQtyOnly || isRef ? "import" : "provider",
+                product_url: hasVerified ? url : "",
+                notes: isQtyOnly ? "qty-only" : isRef ? "referential" : "",
             });
             this._applyProposal(data);
             this._removeCandidateFromReview(cand.id);
-            this.state.aiMessage = "";
+            this.state.aiMessage = isQtyOnly ? this.copy.noVerifiedPrice : "";
         } catch (err) {
             this.state.aiMessage = String(err?.message || err || "Add failed");
         } finally {

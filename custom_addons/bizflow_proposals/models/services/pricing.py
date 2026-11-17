@@ -94,30 +94,27 @@ def default_materials_prompt(proposal, lang_es):
 
 def _build_bom_system_prompt(lang_es, user_prompt):
     rules = (
-        "CRITICAL takeoff rules (derive EVERYTHING from the plan + brief only — no preset budget): "
-        "1) Identify the REAL project from the plan title/cover (e.g. Screened-In Porch Addition). "
-        "Do NOT reduce a porch/room addition to a tiny free-standing deck takeoff. "
-        "2) Read EVERY useful page: floor plans, elevations, material/door schedules, "
-        "foundation/framing (S-sheets), details. Extract lumber sizes, joist spacing, footing "
-        "count/size, Simpson callouts, finishes, doors, screens, siding, trim, decking species. "
-        "3) BOM must be EXHAUSTIVE for scope shown — separate lines for: "
-        "PT ledger, PT joists, PT beams, PT posts, LVL/TJI if shown, Sonotube/forms, concrete bags, "
-        "Simpson hangers, post bases, straps/ties, thru-bolts/screws, decking (species from schedule), "
-        "ceiling wood, siding, trim/fascia, sheathing, flashing, screen panels, bi-fold/screen doors "
-        "from door schedule, adhesives. Respect EXCLUSIONS in the brief — put them in exclusions[] "
-        "and NEVER include them as materials (e.g. paint, EPDM, plumbing, electrical, permits). "
-        "4) QUANTITY METHOD (mandatory): measure plan dimensions; count members at stated spacing; "
-        "count schedule items; convert area to boards/LF using board width; add ~10% waste. "
-        "FORBIDDEN: quantity=1 for lumber, concrete, hangers, decking, siding, trim, fasteners "
-        "when the plan shows repeated members or measurable areas. Doors/special assemblies may be 1–few. "
-        "Expect a complete porch addition BOM to have many distinct lines with real counts. "
-        "5) labor_items: split by trade (footings, framing, roof/sheathing, exterior finish, "
-        "doors/screens). For EACH trade set hours = crew_size × work_days × hours_per_day "
-        "(typical day 8h). A screened porch / framed addition with footings + structure + "
-        "finish + doors is multi-week work for a small crew — do NOT collapse framing+finish "
-        "into only a few dozen total hours. Use Northeast trade hourly_rate $75–$95. "
-        "Put the crew_size×days math in rationale. Do NOT aim at any dollar budget — "
-        "price emerges later from qty×retailer + your hours×rate. "
+        "CRITICAL takeoff rules (derive EVERYTHING from the plan + brief + site photo — no preset budget): "
+        "1) Identify the REAL project from the plan title/cover OR brief (e.g. Screened-In Porch "
+        "Addition, chimney stucco repair). Do NOT invent a porch/deck takeoff when the brief is a "
+        "repair/finish job. Do NOT reduce a porch/room addition to a tiny free-standing deck takeoff. "
+        "2) If a plan PDF is present: read EVERY useful page (floor plans, elevations, schedules, "
+        "foundation/framing, details). If only a site photo + brief: takeoff from measured areas and "
+        "scope steps in the brief (sq ft, coats, prep). "
+        "3) BOM must be EXHAUSTIVE for scope shown. For framed additions: PT ledger/joists/beams/posts, "
+        "LVL/TJI, Sonotube/forms, concrete, Simpson hangers/bases/ties, fasteners, decking, ceiling, "
+        "siding, trim, sheathing, flashing, screens/doors. For stucco/chimney repairs: stucco mix bags "
+        "from area (~20 sq ft/bag +10% waste), bonding agent in gallons (NOT dozens of buckets), "
+        "fiberglass mesh or lath, corner/casing bead, fasteners — separate lines. "
+        "Respect EXCLUSIONS in the brief — put them in exclusions[] and NEVER include them as materials "
+        "(e.g. paint, EPDM, plumbing, electrical, permits, brick crown if excluded). "
+        "4) QUANTITY METHOD (mandatory): measure plan dimensions or use brief sq ft; count members at "
+        "stated spacing; convert area to bags/LF/boards; add ~10% waste. "
+        "FORBIDDEN: quantity=1 for lumber, stucco bags, mesh, hangers, decking, siding, trim, fasteners "
+        "when the plan/brief shows repeated members or measurable areas. "
+        "5) labor_items: split by trade. For EACH trade set hours = crew_size × work_days × hours_per_day "
+        "(typical day 8h). Use Northeast trade hourly_rate $75–$95. Put crew math in rationale. "
+        "Do NOT aim at any dollar budget — price emerges later from qty×retailer + hours×rate. "
         "6) query = English HD/Lowes search terms. Do NOT invent unit material prices."
     )
     schema = (
@@ -240,12 +237,146 @@ def _normalize_labor_item(item, lang_es, area_hint=0.0):
 
 
 def _area_hint(proposal):
+    """Largest sq-ft figure in brief / description / materials prompt."""
     area_hint = 0.0
-    for blob in (proposal.brief or "", proposal.description or "", proposal.work_brief or ""):
-        m = re.search(r"(\d+(?:\.\d+)?)\s*(?:sq\.?\s*ft|pies\s*cuadrados|ft2|ft²)", blob, re.I)
-        if m:
+    pricing = dict((proposal.content or {}).get("pricing") or {})
+    blobs = (
+        proposal.brief or "",
+        proposal.description or "",
+        proposal.work_brief or "",
+        pricing.get("materials_prompt") or "",
+    )
+    pattern = re.compile(
+        r"(\d+(?:\.\d+)?)\s*(?:sq\.?\s*ft|pies\s*cuadrados|ft2|ft²)",
+        re.I,
+    )
+    for blob in blobs:
+        for m in pattern.finditer(blob):
             area_hint = max(area_hint, float(m.group(1)))
     return area_hint
+
+
+def _is_stucco_mix_item(item):
+    """True for stucco mix / coats — not primers, bonders, mesh, or beads."""
+    blob = f"{item.get('name') or ''} {item.get('query') or ''} {item.get('category') or ''}".lower()
+    if any(
+        k in blob
+        for k in (
+            "bonding",
+            "bonder",
+            "primer",
+            "mesh",
+            "lath",
+            "bead",
+            "tape",
+            "fastener",
+            "screw",
+            "nail",
+        )
+    ):
+        return False
+    return any(
+        k in blob
+        for k in ("stucco mix", "stucco bag", "finish coat", "base coat", "scratch coat", "stucco")
+    )
+
+
+def _ensure_repair_bom_minimum(proposal, materials, lang_es):
+    """Seed a realistic repair BOM when vision under-scopes photo+brief jobs."""
+    materials = list(materials or [])
+    blob = " ".join(
+        [
+            proposal.brief or "",
+            proposal.description or "",
+            proposal.work_brief or "",
+            proposal.project_type or "",
+            " ".join(
+                f"{m.get('name') or ''} {m.get('query') or ''}" for m in materials
+            ),
+        ]
+    ).lower()
+    is_stucco_repair = any(k in blob for k in ("stucco", "estuco", "chimney", "chimenea"))
+    if not is_stucco_repair:
+        return materials
+    area = _area_hint(proposal) or 250.0
+    bags = max(round((area / 20.0) * 1.1, 2), 8.0)
+    existing = " ".join(
+        f"{m.get('name') or ''} {m.get('query') or ''}".lower() for m in materials
+    )
+
+    def _has(*keys):
+        return any(k in existing for k in keys)
+
+    seeds = []
+    if not _has("stucco mix", "stucco bag", "finish coat", "scratch coat", "base coat"):
+        seeds.append(
+            {
+                "name": "Mezcla de stucco" if lang_es else "Stucco Mix",
+                "query": "Quikrete stucco mix bag",
+                "quantity": bags,
+                "uom": "bag",
+                "category": "concrete",
+                "notes": f"~20 sq ft/bag +10% for {area:g} sq ft",
+                "required": True,
+            }
+        )
+    if not _has("bonding", "bonder", "acrylic bonder"):
+        seeds.append(
+            {
+                "name": "Agente adhesivo" if lang_es else "Concrete Bonding Agent",
+                "query": "Quikrete concrete bonding adhesive gallon",
+                "quantity": max(round(area / 200.0, 2), 1.0),
+                "uom": "gallon",
+                "category": "concrete",
+                "notes": "Surface prep before recoat",
+                "required": True,
+            }
+        )
+    if not _has("mesh", "lath", "fiberglass"):
+        seeds.append(
+            {
+                "name": "Malla de refuerzo" if lang_es else "Fiberglass Stucco Mesh",
+                "query": "fiberglass stucco mesh roll",
+                "quantity": max(round(area * 1.1, 2), area),
+                "uom": "sq ft",
+                "category": "hardware",
+                "notes": "Reinforce repaired areas",
+                "required": True,
+            }
+        )
+    if not _has("corner bead", "casing bead", "control joint"):
+        seeds.append(
+            {
+                "name": "Esquinero / bead" if lang_es else "Corner Bead",
+                "query": "stucco corner bead",
+                "quantity": max(round(area / 40.0, 2), 4.0),
+                "uom": "lf",
+                "category": "hardware",
+                "notes": "Edges and corners",
+                "required": True,
+            }
+        )
+    if seeds:
+        _logger.info(
+            "repair BOM seed added %s lines for thin takeoff (%s existing)",
+            len(seeds),
+            len(materials),
+        )
+        materials.extend(seeds)
+    # Cap absurd bonding-agent bucket counts that vision sometimes invents.
+    for m in materials:
+        name_blob = f"{m.get('name') or ''} {m.get('query') or ''}".lower()
+        uom = (m.get("uom") or "").lower()
+        if any(k in name_blob for k in ("bonding", "bonder")) and uom in (
+            "bucket",
+            "buckets",
+            "bag",
+            "bags",
+        ):
+            m["uom"] = "gallon"
+            m["quantity"] = max(round(area / 200.0, 2), 1.0)
+            m["query"] = m.get("query") or "concrete bonding adhesive gallon"
+    return materials
 
 
 def _exclusion_blob(proposal, bom=None):
@@ -747,17 +878,11 @@ def _sanitize_material_quantity(item, area_hint):
         qty = 1.0
     if area_hint <= 0:
         return qty
-    blob = f"{item.get('name') or ''} {item.get('query') or ''} {item.get('category') or ''}".lower()
     uom = (item.get("uom") or "").lower()
-    # Stucco / finish coat: ~1 bag per 15–25 sq ft → use 20 sq ft/bag + 10% waste.
-    if any(k in blob for k in ("stucco", "finish coat", "base coat", "scratch coat")) and uom in (
-        "bag",
-        "bags",
-        "bucket",
-        "sack",
-    ):
+    # Stucco mix only — never apply bag yield to bonding agents / primers.
+    if _is_stucco_mix_item(item) and uom in ("bag", "bags", "sack", "sacks"):
         needed = max(qty, (area_hint / 20.0) * 1.1)
-        if needed > qty * 1.5:
+        if needed > qty * 1.05:
             _logger.info(
                 "takeoff qty bump %s: %s → %s for area %s",
                 item.get("name"),
@@ -801,7 +926,21 @@ def _price_candidate(env, suppliers, item, existing_urls, idx, area_hint=0.0):
         selected_key = options[0]["key"]
         options[0]["recommended"] = True
     elif not options:
-        selected_key = ""
+        # Qty-only fallback so the editor can still add the BOM line to the report.
+        selected_key = f"qty-{idx}"
+        options = [
+            {
+                "key": selected_key,
+                "supplier_id": False,
+                "supplier_name": "",
+                "name": name,
+                "price": 0.0,
+                "url": "",
+                "estimated": True,
+                "source": "qty",
+                "recommended": True,
+            }
+        ]
 
     return {
         "id": f"mat-{idx}",
@@ -814,7 +953,15 @@ def _price_candidate(env, suppliers, item, existing_urls, idx, area_hint=0.0):
         "required": bool(item.get("required", True)),
         "options": options,
         "selected_key": selected_key,
-        "unverified": not bool(options),
+        "unverified": any(
+            (o.get("source") == "qty") or (not float(o.get("price") or 0))
+            for o in options
+        )
+        and not any(
+            float(o.get("price") or 0) > 0
+            and (o.get("url") or "").startswith(("http://", "https://"))
+            for o in options
+        ),
     }
 
 
@@ -947,6 +1094,10 @@ def analyze_pricing_preview(proposal, materials_prompt=None):
         proposal, bom, materials, model, lang_es, image_urls
     )
     materials = _strip_excluded_materials(proposal, bom, materials)
+    # Photo+brief repairs (chimney/stucco) often under-scope without a plan PDF.
+    if len(materials) < 6:
+        materials = _ensure_repair_bom_minimum(proposal, materials, lang_es)
+        materials = _strip_excluded_materials(proposal, bom, materials)
     bom["materials"] = materials
     labor_items, labor = _normalize_labor_items(proposal, bom, lang_es)
     labor_items = _refine_labor_from_plan(
@@ -1036,19 +1187,51 @@ def apply_pricing_selection(proposal, candidates=None, labor=None, labor_items=N
         chosen = next((o for o in options if o.get("key") == selected_key), None)
         if not chosen and options:
             chosen = next((o for o in options if o.get("recommended")), None) or options[0]
+        # Qty-only candidates (no retailer hit) still belong on the report.
         if not chosen:
+            name = (item.get("name") or item.get("query") or "").strip()
+            if not name:
+                continue
+            line_vals.append(
+                {
+                    "proposal_id": proposal.id,
+                    "name": name,
+                    "line_type": "material",
+                    "quantity": float(item.get("quantity") or 1.0),
+                    "uom_name": item.get("uom") or "unit",
+                    "price_unit": 0.0,
+                    "cost_unit": 0.0,
+                    "supplier_id": False,
+                    "source": "import",
+                    "product_url": "",
+                    "notes": "qty-only",
+                    "sequence": next_seq,
+                }
+            )
+            next_seq += 10
             continue
         price = float(chosen.get("price") or 0.0)
         url = (chosen.get("url") or "").strip()
-        # Accept verified + referential (price > 0). Skip qty-only without price.
-        if price <= 0 or not (url.startswith("http://") or url.startswith("https://")):
+        is_qty_only = (
+            chosen.get("source") == "qty"
+            or price <= 0
+            or not (url.startswith("http://") or url.startswith("https://"))
+        )
+        if url and url in existing_urls:
             continue
-        if url in existing_urls:
-            continue
-        existing_urls.add(url)
-        source = "provider"
-        if chosen.get("estimated") or chosen.get("source") == "referential":
+        if url:
+            existing_urls.add(url)
+        if is_qty_only:
             source = "import"
+            notes = "qty-only"
+            price = max(price, 0.0)
+            url = ""
+        elif chosen.get("estimated") or chosen.get("source") == "referential":
+            source = "import"
+            notes = "referential"
+        else:
+            source = "provider"
+            notes = ""
         line_vals.append(
             {
                 "proposal_id": proposal.id,
@@ -1061,7 +1244,7 @@ def apply_pricing_selection(proposal, candidates=None, labor=None, labor_items=N
                 "supplier_id": chosen.get("supplier_id") or False,
                 "source": source,
                 "product_url": url,
-                "notes": "referential" if source == "import" else "",
+                "notes": notes,
                 "sequence": next_seq,
             }
         )
