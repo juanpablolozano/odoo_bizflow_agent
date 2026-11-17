@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="hr_timesheet_line_tree_labor" model="ir.ui.view">
+        <field name="name">account.analytic.line.list.bizflow.labor</field>
+        <field name="model">account.analytic.line</field>
+        <field name="inherit_id" ref="hr_timesheet.hr_timesheet_line_tree"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='unit_amount']" position="after">
+                <field name="labor_period_id" optional="hide" groups="hr_timesheet.group_hr_timesheet_approver"/>
+                <field name="labor_locked" optional="hide" widget="boolean" groups="hr_timesheet.group_hr_timesheet_approver"/>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- Vista propia (primary): la búsqueda estándar también la hereda sale_timesheet para otro modelo -->
+    <record id="hr_timesheet_line_search_labor" model="ir.ui.view">
+        <field name="name">account.analytic.line.search.bizflow.labor</field>
+        <field name="model">account.analytic.line</field>
+        <field name="mode">primary</field>
+        <field name="inherit_id" ref="hr_timesheet.hr_timesheet_line_search"/>
+        <field name="arch" type="xml">
+            <xpath expr="//filter[@name='mine']" position="after">
+                <separator/>
+                <filter name="labor_pending" string="Sin liquidar" domain="[('labor_period_id', '=', False)]"/>
+                <filter name="labor_settled" string="Liquidadas" domain="[('labor_period_id', '!=', False)]"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

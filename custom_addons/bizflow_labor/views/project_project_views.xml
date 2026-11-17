@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="edit_project_labor" model="ir.ui.view">
+        <field name="name">project.project.form.bizflow.labor</field>
+        <field name="model">project.project</field>
+        <field name="inherit_id" ref="project.edit_project"/>
+        <field name="arch" type="xml">
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <button name="action_open_labor_cost" type="object" class="oe_stat_button" icon="fa-users"
+                        groups="hr_timesheet.group_hr_timesheet_approver" invisible="is_template">
+                    <div class="o_stat_info">
+                        <span class="o_stat_text">Costo MO</span>
+                        <span class="o_stat_text">por semana</span>
+                    </div>
+                </button>
+            </xpath>
+            <xpath expr="//notebook" position="inside">
+                <page name="bizflow_labor_team" string="Equipo de obra" invisible="is_template">
+                    <group>
+                        <group>
+                            <field name="labor_restrict_team"/>
+                        </group>
+                        <group>
+                            <field name="labor_premium_cost" groups="hr_timesheet.group_hr_timesheet_approver"/>
+                            <field name="labor_hours_overtime" groups="hr_timesheet.group_hr_timesheet_approver"/>
+                        </group>
+                    </group>
+                    <button name="action_open_weekly_entry" type="object" string="Carga semanal de cuadrilla"
+                            class="btn-secondary mb-2" icon="fa-calendar"
+                            groups="hr_timesheet.group_hr_timesheet_approver"/>
+                    <field name="labor_employee_ids">
+                        <list>
+                            <field name="name"/>
+                            <field name="job_title"/>
+                            <field name="parent_id" optional="hide"/>
+                            <field name="work_phone" optional="show"/>
+                        </list>
+                    </field>
+                </page>
+            </xpath>
+        </field>
+    </record>
+</odoo>

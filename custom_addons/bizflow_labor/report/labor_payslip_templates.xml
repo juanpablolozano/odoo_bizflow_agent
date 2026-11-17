@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="labor_payslip_body">
+        <div class="page">
+            <h3>Rol de pago</h3>
+            <div class="row mb-3">
+                <div class="col-6">
+                    <strong>Empleado:</strong> <span t-field="line.employee_id.name"/><br/>
+                    <strong>Cargo:</strong> <span t-out="line.job_title or '-'"/><br/>
+                </div>
+                <div class="col-6">
+                    <strong>Periodo:</strong> <span t-field="line.period_id.name"/><br/>
+                    <strong>Estado:</strong> <span t-field="line.period_id.state"/>
+                </div>
+            </div>
+            <table class="table table-sm o_main_table">
+                <thead>
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Día</th>
+                        <th>Proyecto(s)</th>
+                        <th class="text-end">Normales</th>
+                        <th class="text-end">Suplem.</th>
+                        <th class="text-end">Extraord.</th>
+                        <th class="text-end">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr t-foreach="line._get_daily_summary()" t-as="day">
+                        <td><t t-out="day['date'].strftime('%d/%m/%Y')"/></td>
+                        <td><t t-out="day['weekday']"/></td>
+                        <td><t t-out="day['projects']"/></td>
+                        <td class="text-end"><t t-out="'%.2f' % day['hours_normal']"/></td>
+                        <td class="text-end"><t t-out="'%.2f' % day['hours_overtime']"/></td>
+                        <td class="text-end"><t t-out="'%.2f' % day['hours_extra']"/></td>
+                        <td class="text-end"><t t-out="'%.2f' % day['hours_total']"/></td>
+                    </tr>
+                </tbody>
+                <tfoot>
+                    <tr class="fw-bold">
+                        <td colspan="3">Total horas</td>
+                        <td class="text-end"><t t-out="'%.2f' % line.hours_normal"/></td>
+                        <td class="text-end"><t t-out="'%.2f' % line.hours_overtime"/></td>
+                        <td class="text-end"><t t-out="'%.2f' % line.hours_extra"/></td>
+                        <td class="text-end"><t t-out="'%.2f' % line.hours_total"/></td>
+                    </tr>
+                </tfoot>
+            </table>
+            <div class="row justify-content-end">
+                <div class="col-6">
+                    <table class="table table-sm">
+                        <tr>
+                            <td>Horas normales (<t t-out="'%.2f' % line.hours_normal"/> h × <span t-field="line.pay_rate"/>)</td>
+                            <td class="text-end"><span t-field="line.amount_normal"/></td>
+                        </tr>
+                        <tr>
+                            <td>Suplementarias (× <t t-out="'%.2f' % line.overtime_factor"/>)</td>
+                            <td class="text-end"><span t-field="line.amount_overtime"/></td>
+                        </tr>
+                        <tr>
+                            <td>Extraordinarias (× <t t-out="'%.2f' % line.extra_factor"/>)</td>
+                            <td class="text-end"><span t-field="line.amount_extra"/></td>
+                        </tr>
+                        <tr class="fw-bold border-top">
+                            <td>Total a pagar</td>
+                            <td class="text-end"><span t-field="line.amount_total"/></td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            <p t-if="line.payment_id" class="text-muted">
+                Pagado el <span t-field="line.payment_id.date"/> (<span t-field="line.payment_id.name"/>).
+            </p>
+            <div class="row mt-5 pt-5">
+                <div class="col-6 text-center">
+                    ______________________________<br/>Recibí conforme: <span t-field="line.employee_id.name"/>
+                </div>
+                <div class="col-6 text-center">
+                    ______________________________<br/>Entregué: <span t-field="line.company_id.name"/>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <template id="report_labor_payslip">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="line">
+                <t t-call="web.external_layout">
+                    <t t-call="bizflow_labor.labor_payslip_body"/>
+                </t>
+            </t>
+        </t>
+    </template>
+
+    <template id="report_labor_period">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="period">
+                <t t-call="web.external_layout">
+                    <div class="page">
+                        <h3>Liquidación de mano de obra</h3>
+                        <p><strong>Periodo:</strong> <span t-field="period.name"/> · <strong>Estado:</strong> <span t-field="period.state"/></p>
+                        <table class="table table-sm o_main_table">
+                            <thead>
+                                <tr>
+                                    <th>Empleado</th>
+                                    <th class="text-end">Normales</th>
+                                    <th class="text-end">Suplem.</th>
+                                    <th class="text-end">Extraord.</th>
+                                    <th class="text-end">Tarifa/h</th>
+                                    <th class="text-end">Total a pagar</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr t-foreach="period.line_ids" t-as="line">
+                                    <td><span t-field="line.employee_id.name"/></td>
+                                    <td class="text-end"><t t-out="'%.2f' % line.hours_normal"/></td>
+                                    <td class="text-end"><t t-out="'%.2f' % line.hours_overtime"/></td>
+                                    <td class="text-end"><t t-out="'%.2f' % line.hours_extra"/></td>
+                                    <td class="text-end"><span t-field="line.pay_rate"/></td>
+                                    <td class="text-end"><span t-field="line.amount_total"/></td>
+                                </tr>
+                            </tbody>
+                            <tfoot>
+                                <tr class="fw-bold">
+                                    <td>Total</td>
+                                    <td class="text-end"><t t-out="'%.2f' % period.hours_normal"/></td>
+                                    <td class="text-end"><t t-out="'%.2f' % period.hours_overtime"/></td>
+                                    <td class="text-end"><t t-out="'%.2f' % period.hours_extra"/></td>
+                                    <td/>
+                                    <td class="text-end"><span t-field="period.amount_total"/></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                        <h5 class="mt-4">Costo de mano de obra por proyecto</h5>
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Proyecto</th>
+                                    <th>Empleado</th>
+                                    <th class="text-end">Horas</th>
+                                    <th class="text-end">Costo horas</th>
+                                    <th class="text-end">Recargo extras</th>
+                                    <th class="text-end">Costo total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr t-foreach="period.project_line_ids.sorted(lambda p: (p.project_id.name, p.employee_id.name))" t-as="pl">
+                                    <td><span t-field="pl.project_id.name"/></td>
+                                    <td><span t-field="pl.employee_id.name"/></td>
+                                    <td class="text-end"><t t-out="'%.2f' % pl.hours_total"/></td>
+                                    <td class="text-end"><span t-field="pl.cost_timesheet"/></td>
+                                    <td class="text-end"><span t-field="pl.cost_premium"/></td>
+                                    <td class="text-end"><span t-field="pl.cost_total"/></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </t>
+                <t t-foreach="period.line_ids" t-as="line">
+                    <t t-call="web.external_layout">
+                        <t t-call="bizflow_labor.labor_payslip_body"/>
+                    </t>
+                </t>
+            </t>
+        </t>
+    </template>
+</odoo>

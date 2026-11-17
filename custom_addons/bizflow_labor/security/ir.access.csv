@@ -1,0 +1,13 @@
+id,name,model_id,group_id/id,operation,domain
+access_labor_period_approver,Liquidación MO: aprobador lee,bizflow.labor.period,hr_timesheet.group_hr_timesheet_approver,r,
+access_labor_period_manager,Liquidación MO: administrador,bizflow.labor.period,hr_timesheet.group_timesheet_manager,crud,
+access_labor_line_approver,Línea liquidación: aprobador lee,bizflow.labor.line,hr_timesheet.group_hr_timesheet_approver,r,
+access_labor_line_manager,Línea liquidación: administrador,bizflow.labor.line,hr_timesheet.group_timesheet_manager,crud,
+access_labor_line_project_approver,Costo MO proyecto: aprobador lee,bizflow.labor.line.project,hr_timesheet.group_hr_timesheet_approver,r,
+access_labor_line_project_manager,Costo MO proyecto: administrador,bizflow.labor.line.project,hr_timesheet.group_timesheet_manager,crud,
+access_labor_pay_wizard_manager,Pago MO: administrador,bizflow.labor.pay.wizard,hr_timesheet.group_timesheet_manager,crud,
+access_labor_weekly_entry_approver,Carga semanal: aprobador,bizflow.labor.weekly.entry,hr_timesheet.group_hr_timesheet_approver,crud,
+access_labor_weekly_entry_line_approver,Carga semanal línea: aprobador,bizflow.labor.weekly.entry.line,hr_timesheet.group_hr_timesheet_approver,crud,
+rule_labor_period_company,Liquidación MO: multiempresa,bizflow.labor.period,,crud,"[('company_id', 'in', company_ids)]"
+rule_labor_line_company,Línea liquidación: multiempresa,bizflow.labor.line,,crud,"[('company_id', 'in', company_ids)]"
+rule_labor_line_project_company,Costo MO proyecto: multiempresa,bizflow.labor.line.project,,crud,"[('company_id', 'in', company_ids)]"

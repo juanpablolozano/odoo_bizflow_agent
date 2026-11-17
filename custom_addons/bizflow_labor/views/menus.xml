@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="action_labor_weekly_entry" model="ir.actions.act_window">
+        <field name="name">Carga semanal de cuadrilla</field>
+        <field name="res_model">bizflow.labor.weekly.entry</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <menuitem id="menu_labor_root" name="Mano de obra" parent="hr_timesheet.timesheet_menu_root"
+              sequence="15" groups="hr_timesheet.group_hr_timesheet_approver"/>
+    <menuitem id="menu_labor_weekly_entry" name="Carga semanal de cuadrilla" parent="menu_labor_root"
+              action="action_labor_weekly_entry" sequence="5"/>
+    <menuitem id="menu_labor_period" name="Liquidaciones" parent="menu_labor_root"
+              action="action_labor_period" sequence="10"/>
+    <menuitem id="menu_labor_pending" name="Pendiente de pago" parent="menu_labor_root"
+              action="action_labor_line_pending" sequence="20"/>
+
+    <menuitem id="menu_labor_report_hours_week" name="Horas por semana" parent="hr_timesheet.menu_timesheets_reports"
+              action="action_timesheet_hours_by_week" sequence="1" groups="hr_timesheet.group_hr_timesheet_approver"/>
+    <menuitem id="menu_labor_report_project_cost" name="Costo de mano de obra por proyecto"
+              parent="hr_timesheet.menu_timesheets_reports" action="action_labor_project_cost" sequence="2"
+              groups="hr_timesheet.group_hr_timesheet_approver"/>
+    <menuitem id="menu_labor_report_lines" name="Liquidaciones por empleado"
+              parent="hr_timesheet.menu_timesheets_reports" action="action_labor_line_report" sequence="3"
+              groups="hr_timesheet.group_hr_timesheet_approver"/>
+</odoo>

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_labor_pay_wizard_form" model="ir.ui.view">
+        <field name="name">bizflow.labor.pay.wizard.form</field>
+        <field name="model">bizflow.labor.pay.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Pagar mano de obra">
+                <group>
+                    <group>
+                        <field name="period_id"/>
+                        <field name="employee_count"/>
+                        <field name="amount_total"/>
+                        <field name="currency_id" invisible="1"/>
+                        <field name="company_id" invisible="1"/>
+                    </group>
+                    <group>
+                        <field name="journal_id" options="{'no_create': True}"/>
+                        <field name="payment_date"/>
+                    </group>
+                </group>
+                <p class="text-muted">Se crea un pago por empleado, conciliado con su asiento de sueldos por pagar.</p>
+                <footer>
+                    <button name="action_pay" type="object" string="Registrar pagos" class="btn-primary"/>
+                    <button special="cancel" string="Cancelar" class="btn-secondary"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>

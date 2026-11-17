@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="res_config_settings_view_form_labor" model="ir.ui.view">
+        <field name="name">res.config.settings.form.bizflow.labor</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="hr_timesheet.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//app[@name='hr_timesheet']" position="inside">
+                <block title="Liquidación de mano de obra" name="bizflow_labor">
+                    <setting string="Periodicidad y jornada" company_dependent="1"
+                             help="Cada cuánto se paga y cuántas horas tiene la jornada normal">
+                        <div class="content-group">
+                            <div class="row mt8"><label for="labor_period_type" class="col-lg-6 o_light_label"/><field name="labor_period_type" class="col-lg-6"/></div>
+                            <div class="row"><label for="labor_daily_hours" class="col-lg-6 o_light_label"/><field name="labor_daily_hours" class="col-lg-3"/></div>
+                            <div class="row"><label for="labor_weekly_hours" class="col-lg-6 o_light_label"/><field name="labor_weekly_hours" class="col-lg-3"/></div>
+                        </div>
+                    </setting>
+                    <setting string="Recargos por horas extra" company_dependent="1"
+                             help="Confirme los factores y topes con su contador">
+                        <div class="content-group">
+                            <div class="row mt8"><label for="labor_overtime_factor" class="col-lg-6 o_light_label"/><field name="labor_overtime_factor" class="col-lg-3"/></div>
+                            <div class="row"><label for="labor_extra_factor" class="col-lg-6 o_light_label"/><field name="labor_extra_factor" class="col-lg-3"/></div>
+                            <div class="row"><label for="labor_weekend_is_extra" class="col-lg-6 o_light_label"/><field name="labor_weekend_is_extra" class="col-lg-3"/></div>
+                            <div class="row"><label for="labor_max_overtime_week" class="col-lg-6 o_light_label"/><field name="labor_max_overtime_week" class="col-lg-3"/></div>
+                        </div>
+                    </setting>
+                    <setting string="Costo cargado" company_dependent="1"
+                             help="Factor por defecto: costo por hora = tarifa de pago × factor (cargas patronales, décimos, vacaciones…)">
+                        <field name="labor_cost_factor"/>
+                    </setting>
+                    <setting string="Contabilidad" company_dependent="1"
+                             help="El asiento de pago no lleva analítica: el costo del proyecto ya entra por los partes de horas">
+                        <div class="content-group">
+                            <div class="row mt8"><label for="labor_journal_id" class="col-lg-5 o_light_label"/><field name="labor_journal_id" class="col-lg-7"/></div>
+                            <div class="row"><label for="labor_payment_journal_id" class="col-lg-5 o_light_label"/><field name="labor_payment_journal_id" class="col-lg-7"/></div>
+                            <div class="row"><label for="labor_expense_account_id" class="col-lg-5 o_light_label"/><field name="labor_expense_account_id" class="col-lg-7"/></div>
+                            <div class="row"><label for="labor_payable_account_id" class="col-lg-5 o_light_label"/><field name="labor_payable_account_id" class="col-lg-7"/></div>
+                        </div>
+                    </setting>
+                </block>
+            </xpath>
+        </field>
+    </record>
+</odoo>
