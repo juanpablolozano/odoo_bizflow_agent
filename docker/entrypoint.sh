@@ -13,17 +13,20 @@ fi
 : "${ODOO_MODULES:=bizflow_proposals}"
 : "${ADMIN_PASSWD:=changeme}"
 
-ODOO_RC="${ODOO_RC:-/etc/odoo/odoo.conf}"
+TEMPLATE_RC="${ODOO_RC:-/etc/odoo/odoo.conf}"
+RUNTIME_RC="/var/lib/odoo/odoo.conf"
+export ODOO_RC="$RUNTIME_RC"
 
-if [ -f "$ODOO_RC" ] && [ -w "$ODOO_RC" ]; then
-  if [ -n "${ADMIN_PASSWD}" ]; then
-    sed -i "s|^admin_passwd *=.*|admin_passwd = ${ADMIN_PASSWD}|" "$ODOO_RC"
-  fi
-  if ! grep -qE '^\s*db_name\s*=' "$ODOO_RC"; then
-    echo "db_name = ${ODOO_DB}" >> "$ODOO_RC"
-  else
-    sed -i "s|^db_name *=.*|db_name = ${ODOO_DB}|" "$ODOO_RC"
-  fi
+mkdir -p /var/lib/odoo
+cp "$TEMPLATE_RC" "$RUNTIME_RC"
+
+if [ -n "${ADMIN_PASSWD}" ]; then
+  sed -i "s|^admin_passwd *=.*|admin_passwd = ${ADMIN_PASSWD}|" "$RUNTIME_RC"
+fi
+if ! grep -qE '^\s*db_name\s*=' "$RUNTIME_RC"; then
+  echo "db_name = ${ODOO_DB}" >> "$RUNTIME_RC"
+else
+  sed -i "s|^db_name *=.*|db_name = ${ODOO_DB}|" "$RUNTIME_RC"
 fi
 
 DB_ARGS=()
