@@ -1,0 +1,13 @@
+.git
+.gitignore
+.DS_Store
+venv/
+.local/
+odoo/
+docs/
+**/__pycache__/
+**/*.py[cod]
+**/*.pyc
+**/*.pyo
+*.md
+!custom_addons/**/README.md

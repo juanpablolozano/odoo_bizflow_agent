@@ -1,0 +1,47 @@
+services:
+  odoo:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    environment:
+      - SERVICE_FQDN_ODOO_8069
+      - HOST=postgresql
+      - USER=${SERVICE_USER_POSTGRES}
+      - PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - ODOO_DB=odoo
+      - ODOO_MODULES=bizflow_proposals
+      - ADMIN_PASSWD=${SERVICE_PASSWORD_64_ODOOADMIN}
+      - CHROME_BIN=/usr/bin/chromium
+    volumes:
+      - odoo-web-data:/var/lib/odoo
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8069/web/login"]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+      start_period: 120s
+    restart: unless-stopped
+
+  postgresql:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=postgres
+    volumes:
+      - postgresql-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d postgres"]
+      interval: 5s
+      timeout: 10s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  odoo-web-data:
+  postgresql-data:
