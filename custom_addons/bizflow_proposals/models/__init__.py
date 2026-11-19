@@ -15,4 +15,7 @@ from . import bizflow_proposal_signing
 from . import bizflow_proposal_cost
 from . import bizflow_share_link
 from . import crm_lead
+from . import sale_order
+from . import sale_order_line
+from . import ir_actions_report
 from . import services

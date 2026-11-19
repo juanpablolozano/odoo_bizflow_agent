@@ -76,6 +76,20 @@
     flex: 1;
 }
 
+.o_bizflow_new.o_bizflow_new_setup_only {
+    grid-template-columns: minmax(320px, 560px);
+    justify-content: center;
+    background: var(--bf-bg, #f4f6f8);
+}
+
+.o_bizflow_new.o_bizflow_new_setup_only .o_bizflow_editor_sidebar {
+    border-right: 0;
+    border-radius: 12px;
+    margin: 16px;
+    max-width: 560px;
+    width: 100%;
+}
+
 .o_bizflow_editor_sidebar {
     background: var(--bf-card);
     border-right: 1px solid var(--bf-line);

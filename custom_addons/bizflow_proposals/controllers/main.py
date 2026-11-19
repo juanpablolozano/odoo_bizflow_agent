@@ -47,11 +47,13 @@ class BizflowProposalController(http.Controller):
 
     @http.route("/bizflow/proposals", type="jsonrpc", auth="user", methods=["POST"])
     def create_proposal(self, **payload):
+        """Create a quotation (sale.order) + internal editor doc. Returns editor payload."""
         brief = payload.get("brief") or payload.get("description") or ""
         vals = {
-            "name": payload.get("name") or request.env._("New construction proposal"),
+            "name": payload.get("name") or request.env._("New quotation"),
             "lead_id": payload.get("lead_id") or False,
             "partner_id": payload.get("partner_id") or False,
+            "order_id": payload.get("order_id") or False,
             "project_type": payload.get("project_type") or "",
             "location": payload.get("location") or "",
             "description": brief,
@@ -60,12 +62,13 @@ class BizflowProposalController(http.Controller):
             "language": payload.get("language") or "es",
             "kind": payload.get("kind") or "proposal",
         }
+        # Quotation-first: bizflow.proposal.create ensures sale.order when order_id missing.
         proposal = request.env["bizflow.proposal"].create(vals)
         write_with_ai = bool(payload.get("write_with_ai") or payload.get("generate"))
         if write_with_ai:
             proposal.start_generation(
                 extra_instructions=payload.get("instructions") or "",
-                user_message=request.env._("Write the full proposal from this description."),
+                user_message=request.env._("Write the full quotation from this description."),
             )
         return proposal.to_editor_payload()
 
@@ -203,6 +206,10 @@ class BizflowProposalController(http.Controller):
         else:
             line = Line.create(vals)
         proposal.sync_utility_from_lines()
+        if proposal.order_id:
+            from odoo.addons.bizflow_proposals.models.services import order_sync
+
+            order_sync.sync_proposal_to_sale_order(proposal)
         return proposal.to_editor_payload()
 
     @http.route(
@@ -219,6 +226,10 @@ class BizflowProposalController(http.Controller):
         if line and line.proposal_id.id == proposal.id:
             line.unlink()
         proposal.sync_utility_from_lines()
+        if proposal.order_id:
+            from odoo.addons.bizflow_proposals.models.services import order_sync
+
+            order_sync.sync_proposal_to_sale_order(proposal)
         return proposal.to_editor_payload()
 
     @http.route(

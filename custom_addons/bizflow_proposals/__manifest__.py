@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
 {
     "name": "BizFlow Proposals",
-    "version": "1.4.1",
+    "version": "1.5.0",
     "category": "Sales/CRM",
-    "summary": "Construction proposals with AI generate/chat, materials, utility, and CRM",
+    "summary": "Construction quotations with AI editor, materials takeoff, CRM and invoicing",
     "description": """
-Construction-oriented proposal editor for contractors (Wise /proposals parity).
-Create from a description + photos, generate the full proposal with AI, edit via chat,
-manage images, materials/suppliers, project utility, share links, and PDF.
+Construction-oriented quotation editor for contractors.
+Create quotations from CRM or the BizFlow editor (AI generate, materials/labor takeoff),
+print the construction PDF as the quotation PDF, confirm and invoice via Sales.
     """,
     "author": "BizFlow",
     "license": "LGPL-3",
@@ -17,6 +17,8 @@ manage images, materials/suppliers, project utility, share links, and PDF.
         "portal",
         "web",
         "contacts",
+        "sale_management",
+        "sale_crm",
     ],
     "data": [
         "security/bizflow_security.xml",
@@ -25,6 +27,7 @@ manage images, materials/suppliers, project utility, share links, and PDF.
         "data/supplier_data.xml",
         "data/ai_model_data.xml",
         "data/pdf_template_data.xml",
+        "data/sale_product_data.xml",
         "views/bizflow_proposal_views.xml",
         "views/bizflow_material_views.xml",
         "views/bizflow_supplier_views.xml",
@@ -32,6 +35,7 @@ manage images, materials/suppliers, project utility, share links, and PDF.
         "views/bizflow_pdf_template_views.xml",
         "views/bizflow_company_profile_views.xml",
         "views/crm_lead_views.xml",
+        "views/sale_order_views.xml",
         "views/menus.xml",
         "report/proposal_report.xml",
     ],

@@ -39,6 +39,14 @@ class BizflowProposal(models.Model):
     )
     partner_id = fields.Many2one("res.partner", string="Client", tracking=True)
     lead_id = fields.Many2one("crm.lead", string="CRM Lead/Opportunity", tracking=True)
+    order_id = fields.Many2one(
+        "sale.order",
+        string="Quotation",
+        ondelete="cascade",
+        index=True,
+        tracking=True,
+        help="Commercial quotation this editor document belongs to.",
+    )
     user_id = fields.Many2one(
         "res.users",
         string="Salesperson",
@@ -158,9 +166,46 @@ class BizflowProposal(models.Model):
         store=True,
     )
 
+    @api.model
+    def _ensure_quotation_for_vals(self, vals):
+        """Quotation-first: create sale.order when saving from editor/CRM without one."""
+        if vals.get("order_id"):
+            return vals
+        partner_id = vals.get("partner_id") or False
+        lead_id = vals.get("lead_id") or False
+        lead = self.env["crm.lead"].browse(lead_id) if lead_id else self.env["crm.lead"]
+        if lead and not partner_id:
+            partner_id = lead.partner_id.id or False
+        name = vals.get("name") or (lead.name if lead else None) or self.env._("Quotation")
+        if not partner_id:
+            partner = self.env["res.partner"].create({"name": name})
+            partner_id = partner.id
+            vals["partner_id"] = partner_id
+        order_vals = {
+            "partner_id": partner_id,
+            "origin": name,
+        }
+        if lead_id:
+            order_vals["opportunity_id"] = lead_id
+            if lead.team_id:
+                order_vals["team_id"] = lead.team_id.id
+            if lead.user_id:
+                order_vals["user_id"] = lead.user_id.id
+        order = self.env["sale.order"].create(order_vals)
+        vals["order_id"] = order.id
+        if not vals.get("partner_id"):
+            vals["partner_id"] = partner_id
+        if lead_id and not vals.get("lead_id"):
+            vals["lead_id"] = lead_id
+        if not vals.get("name"):
+            vals["name"] = name
+        return vals
+
     @api.model_create_multi
     def create(self, vals_list):
+        prepared = []
         for vals in vals_list:
+            vals = dict(vals)
             if vals.get("code", "/") == "/":
                 vals["code"] = self.env["ir.sequence"].next_by_code("bizflow.proposal") or "/"
             vals["content"] = normalize_content(vals.get("content") or {})
@@ -175,9 +220,14 @@ class BizflowProposal(models.Model):
                 vals["brief"] = vals["description"]
             if vals.get("brief") and not vals.get("description"):
                 vals["description"] = vals["brief"]
-        records = super().create(vals_list)
+            # Skip auto-quotation when creating the internal doc from sale.order helper
+            # (order_id already set) or when explicitly skipped.
+            if not vals.get("order_id") and not self.env.context.get("bizflow_skip_auto_order"):
+                vals = self._ensure_quotation_for_vals(vals)
+            prepared.append(vals)
+        records = super().create(prepared)
         for rec in records:
-            rec.log_change("create", summary="Created proposal", restorable=False)
+            rec.log_change("create", summary="Created quotation editor doc", restorable=False)
         return records
 
     def write(self, vals):
@@ -225,15 +275,41 @@ class BizflowProposal(models.Model):
             rec.amount_utility = utility_amount
             rec.utility_margin = (utility_amount / revenue * 100.0) if revenue else 0.0
 
+    def is_editor_setup_needed(self):
+        """True when the editor should open the blank-project onboarding UI."""
+        self.ensure_one()
+        has_text = bool((self.brief or "").strip() or (self.work_brief or "").strip())
+        return not has_text and not self.asset_ids and not self.line_ids
+
     def action_open_editor(self):
         self.ensure_one()
         return {
             "type": "ir.actions.client",
             "tag": "bizflow_proposal_editor",
-            "name": self.env._("Proposal editor"),
-            "params": {"proposal_id": self.id},
+            "name": self.env._("Quotation editor"),
+            "params": {
+                "proposal_id": self.id,
+                "order_id": self.order_id.id if self.order_id else False,
+                "setup": self.is_editor_setup_needed(),
+            },
             "target": "current",
         }
+
+    def action_sync_to_quotation(self):
+        self.ensure_one()
+        if not self.order_id:
+            vals = self._ensure_quotation_for_vals(
+                {
+                    "name": self.name,
+                    "partner_id": self.partner_id.id or False,
+                    "lead_id": self.lead_id.id or False,
+                }
+            )
+            self.order_id = vals.get("order_id")
+        from odoo.addons.bizflow_proposals.models.services import order_sync
+
+        order_sync.sync_proposal_to_sale_order(self)
+        return True
 
     def action_set_review(self):
         self.write({"state": "review"})
@@ -1270,6 +1346,8 @@ display:flex;align-items:flex-end;}}
             "partner_id": self.partner_id.id,
             "partner_name": self.partner_id.display_name,
             "lead_id": self.lead_id.id,
+            "order_id": self.order_id.id,
+            "order_name": self.order_id.display_name if self.order_id else "",
             "project_type": self.project_type or "",
             "location": self.location or "",
             "description": self.description or "",

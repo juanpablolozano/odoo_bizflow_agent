@@ -4,7 +4,7 @@
         <div class="o_bizflow_editor" t-att-class="{'o_bizflow_refreshing': this.state.refreshing}">
             <div class="o_bizflow_editor_header">
                 <t t-if="this.state.mode === 'edit' and this.state.proposal">
-                    <button type="button" class="secondary" t-on-click="() => this.loadList()">←</button>
+                    <button type="button" class="secondary" t-on-click="() => this.onBack()">←</button>
                     <span class="badge" t-esc="this.state.proposal.code"/>
                     <h1 t-esc="this.state.proposal.name"/>
                     <span class="badge" t-esc="this.state.proposal.state"/>
@@ -15,7 +15,7 @@
                             t-att-disabled="this.state.refreshing">Refresh</button>
                 </t>
                 <t t-elif="this.state.mode === 'new'">
-                    <button class="secondary" t-on-click="() => this.loadList()">←</button>
+                    <button class="secondary" t-on-click="() => this.onBack()">←</button>
                     <h1 t-esc="this.copy.newProposal"/>
                 </t>
                 <t t-else="">
@@ -42,9 +42,9 @@
                 </div>
             </t>
 
-            <!-- NEW -->
+            <!-- NEW / SETUP (3A: setupOnly = onboarding alone, no preview) -->
             <t t-if="this.state.mode === 'new'">
-                <div class="o_bizflow_new">
+                <div class="o_bizflow_new" t-att-class="{'o_bizflow_new_setup_only': this.state.setupOnly}">
                     <aside class="o_bizflow_editor_sidebar">
                         <p class="o_bizflow_eyebrow" t-esc="this.copy.tellAi"/>
                         <div class="o_bizflow_field">
@@ -123,8 +123,9 @@
                                     t-att-disabled="this.state.creating"
                                     t-esc="this.copy.createAi"/>
                         </div>
+                        <p t-if="this.state.aiMessage" class="o_bizflow_ai_message" t-esc="this.state.aiMessage"/>
                     </aside>
-                    <main class="o_bizflow_editor_preview o_bizflow_cover_preview">
+                    <main t-if="!this.state.setupOnly" class="o_bizflow_editor_preview o_bizflow_cover_preview">
                         <div class="o_bizflow_cover_card">
                             <p class="eyebrow">BizFlow · Proposal</p>
                             <h2 t-esc="this.state.clientName || 'Client'"/>

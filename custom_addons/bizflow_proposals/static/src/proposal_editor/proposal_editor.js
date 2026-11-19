@@ -12,6 +12,7 @@ import {
 } from "@odoo/owl";
 import { registry } from "@web/core/registry";
 import { rpc } from "@web/core/network/rpc";
+import { useService } from "@web/core/utils/hooks";
 import { standardActionServiceProps } from "@web/webclient/actions/action_plugin";
 
 const SECTION_FIELDS = {
@@ -126,12 +127,21 @@ export class ProposalEditorAction extends Component {
             costName: "",
             costRate: "0",
             costQty: "1",
+            setupOnly: false,
+            linkedProposalId: null,
+            returnToPrevious: false,
         });
         this._previewWired = false;
+        this.actionService = useService("action");
         onWillStart(async () => {
             const params = this.props.action?.params || {};
+            this.state.returnToPrevious = Boolean(params.proposal_id || params.order_id);
             if (params.proposal_id) {
-                await this.openProposal(params.proposal_id);
+                if (params.setup) {
+                    await this.openSetup(params.proposal_id);
+                } else {
+                    await this.openProposal(params.proposal_id);
+                }
             } else {
                 await this.loadList();
             }
@@ -142,6 +152,18 @@ export class ProposalEditorAction extends Component {
             this._syncPreviewActive();
         });
         onWillUnmount(() => this._stopPoll());
+    }
+
+    onBack() {
+        if (this.state.returnToPrevious) {
+            try {
+                this.actionService.restore();
+                return;
+            } catch (_err) {
+                // Fall through to list if restore is unavailable.
+            }
+        }
+        this.loadList();
     }
 
     get copy() {
@@ -395,17 +417,46 @@ export class ProposalEditorAction extends Component {
         this.state.list = data.items || [];
         this.state.mode = "list";
         this.state.proposal = null;
+        this.state.setupOnly = false;
+        this.state.linkedProposalId = null;
         this._stopPoll();
     }
 
     startNew() {
         this.state.mode = "new";
         this.state.proposal = null;
+        this.state.setupOnly = false;
+        this.state.linkedProposalId = null;
         this.state.brief = "";
         this.state.workBrief = "";
         this.state.clientName = "";
         this.state.projectType = "";
         this.state.location = "";
+        this.state.pendingPhotos = [];
+        this.state.pendingPlans = [];
+        this._stopPoll();
+    }
+
+    _isProposalEmpty(data) {
+        const brief = String(data?.brief || data?.description || "").trim();
+        const work = String(data?.work_brief || "").trim();
+        const assets = data?.assets || [];
+        const lines = data?.lines || [];
+        return !brief && !work && !assets.length && !lines.length;
+    }
+
+    async openSetup(id) {
+        const data = await this._httpGet(`/bizflow/proposals/${id}`);
+        this.state.linkedProposalId = data.id;
+        this.state.proposal = data;
+        this.state.setupOnly = true;
+        this.state.mode = "new";
+        this.state.clientName = data.partner_name || data.name || "";
+        this.state.brief = data.brief || data.description || "";
+        this.state.workBrief = data.work_brief || "";
+        this.state.projectType = data.project_type || "";
+        this.state.location = data.location || "";
+        this.state.language = data.language || this.state.language || "es";
         this.state.pendingPhotos = [];
         this.state.pendingPlans = [];
         this._stopPoll();
@@ -480,7 +531,13 @@ export class ProposalEditorAction extends Component {
 
     async openProposal(id, opts = {}) {
         const data = await this._httpGet(`/bizflow/proposals/${id}`);
+        if (!opts.forceEdit && (opts.setup || this._isProposalEmpty(data))) {
+            await this.openSetup(id);
+            return;
+        }
         this._applyProposal(data, opts);
+        this.state.setupOnly = false;
+        this.state.linkedProposalId = data.id;
         this.state.mode = "edit";
         if (!opts.preferMaterialsReview) {
             this.state.tab = "sections";
@@ -694,18 +751,35 @@ export class ProposalEditorAction extends Component {
                 (this.state.language === "es" ? "Nueva propuesta de obra" : "New construction proposal");
             const hasPending =
                 (this.state.pendingPhotos || []).length > 0 || (this.state.pendingPlans || []).length > 0;
-            // Create first without AI when files are staged so generation sees photos/plan.
-            const data = await rpc("/bizflow/proposals", {
-                name,
-                brief: this.state.brief,
-                description: this.state.brief,
-                work_brief: this.state.workBrief,
-                project_type: this.state.projectType,
-                location: this.state.location,
-                language: this.state.language,
-                write_with_ai: !!withAi && !hasPending,
-            });
+            const linkedId = this.state.linkedProposalId || this.state.proposal?.id;
+            let data;
+            if (linkedId) {
+                // Update existing quotation-linked proposal (setup from sale.order).
+                data = await rpc(`/bizflow/proposals/${linkedId}/meta`, {
+                    name,
+                    brief: this.state.brief,
+                    description: this.state.brief,
+                    work_brief: this.state.workBrief,
+                    project_type: this.state.projectType,
+                    location: this.state.location,
+                    language: this.state.language,
+                });
+            } else {
+                // Create first without AI when files are staged so generation sees photos/plan.
+                data = await rpc("/bizflow/proposals", {
+                    name,
+                    brief: this.state.brief,
+                    description: this.state.brief,
+                    work_brief: this.state.workBrief,
+                    project_type: this.state.projectType,
+                    location: this.state.location,
+                    language: this.state.language,
+                    write_with_ai: !!withAi && !hasPending,
+                });
+            }
             this._applyProposal(data);
+            this.state.setupOnly = false;
+            this.state.linkedProposalId = data.id;
             this.state.mode = "edit";
             this.state.tab = "sections";
             if (hasPending && data?.id) {
@@ -713,7 +787,7 @@ export class ProposalEditorAction extends Component {
                 if (afterUpload) {
                     this._applyProposal(afterUpload);
                 } else {
-                    await this.openProposal(data.id);
+                    await this.openProposal(data.id, { forceEdit: true });
                 }
                 if (withAi) {
                     await rpc(`/bizflow/proposals/${data.id}/generate`, {
@@ -722,6 +796,12 @@ export class ProposalEditorAction extends Component {
                     this._startPoll();
                     await this.onRefresh();
                 }
+            } else if (linkedId && withAi && data?.id) {
+                await rpc(`/bizflow/proposals/${data.id}/generate`, {
+                    message: "Write the full proposal from the description, photos, and plan.",
+                });
+                this._startPoll();
+                await this.onRefresh();
             }
             await this._loadChat("");
             this._startPoll();

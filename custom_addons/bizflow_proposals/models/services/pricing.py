@@ -1305,6 +1305,13 @@ def apply_pricing_selection(proposal, candidates=None, labor=None, labor_items=N
         proposal.sync_utility_from_lines()
     except Exception:
         _logger.exception("sync_utility after pricing apply failed")
+    try:
+        if proposal.order_id:
+            from . import order_sync
+
+            order_sync.sync_proposal_to_sale_order(proposal)
+    except Exception:
+        _logger.exception("order sync after pricing apply failed")
 
     return {
         "ok": True,
